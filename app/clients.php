@@ -206,7 +206,7 @@ include 'includes/header.php';
     <div class="page-header">
         <h1><i class="fas fa-users"></i> Gestion des Clients</h1>
         <?php if (hasPermission('clients_create')): ?>
-            <button class="btn btn-primary" onclick="openModal('addClientModal')">
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addClientModal">
                 <i class="fas fa-plus"></i> Nouveau Client
             </button>
         <?php endif; ?>
@@ -824,11 +824,26 @@ include 'includes/header.php';
 </style>
 
 <script>
+    const _modals = {};
+
     function openModal(modalId) {
         const modalEl = document.getElementById(modalId);
         if (!modalEl) return;
-        const m = new bootstrap.Modal(modalEl);
-        m.show();
+        if (!window.bootstrap || !window.bootstrap.Modal) {
+            if (window.__fallbackShowModal) {
+                window.__fallbackShowModal(modalId);
+                return;
+            }
+            modalEl.classList.add('show');
+            modalEl.style.display = 'block';
+            return;
+        }
+        if (!_modals[modalId]) {
+            _modals[modalId] = new bootstrap.Modal(modalEl, {
+                backdrop: 'static'
+            });
+        }
+        _modals[modalId].show();
     }
 
     function editClient(client) {
@@ -867,12 +882,7 @@ include 'includes/header.php';
         }
     }
 
-    // Fermer les modals en cliquant en dehors
-    window.onclick = function(event) {
-        if (event.target.classList.contains('modal')) {
-            event.target.style.display = 'none';
-        }
-    }
+    // Fermeture gérée par Bootstrap ou par le fallback global (header)
 </script>
 
 <?php include 'includes/footer.php'; ?>

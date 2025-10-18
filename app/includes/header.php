@@ -335,6 +335,88 @@
     <!-- Bootstrap JS (popups/modals) -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
 
+    <style>
+        /* Fallback minimal si Bootstrap CSS n'est pas chargé: cache les modals par défaut */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1050;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+        }
+
+        .modal.show {
+            display: block;
+        }
+
+        .modal .modal-dialog {
+            position: relative;
+            margin: 1.75rem auto;
+            max-width: 900px;
+        }
+
+        .modal .modal-content {
+            background: #fff;
+            border-radius: 0.5rem;
+            overflow: hidden;
+        }
+
+        .btn-close {
+            border: 0;
+            background: transparent;
+            width: 1em;
+            height: 1em;
+            opacity: .5;
+        }
+    </style>
+
+    <script>
+        // Fallback JS si Bootstrap JS indisponible: bascule simple d'affichage des modals
+        (function() {
+            if (window.bootstrap && window.bootstrap.Modal) {
+                return;
+            }
+
+            function showModal(id) {
+                var el = document.getElementById(id);
+                if (!el) return;
+                el.classList.add('show');
+                el.style.display = 'block';
+                el.setAttribute('aria-modal', 'true');
+                el.removeAttribute('aria-hidden');
+            }
+
+            function hideModal(el) {
+                el.classList.remove('show');
+                el.style.display = 'none';
+                el.removeAttribute('aria-modal');
+                el.setAttribute('aria-hidden', 'true');
+            }
+            window.__fallbackShowModal = showModal;
+            // wiring des boutons data-bs-toggle
+            document.addEventListener('click', function(e) {
+                var btn = e.target.closest('[data-bs-toggle="modal"]');
+                if (btn) {
+                    var target = btn.getAttribute('data-bs-target');
+                    if (target && target.startsWith('#')) {
+                        e.preventDefault();
+                        showModal(target.substring(1));
+                    }
+                }
+                var closeBtn = e.target.closest('[data-bs-dismiss="modal"], .btn-close');
+                if (closeBtn) {
+                    var modal = closeBtn.closest('.modal');
+                    if (modal) {
+                        e.preventDefault();
+                        hideModal(modal);
+                    }
+                }
+            });
+        })();
+    </script>
+
     <?php if (isLoggedIn()): ?>
         <nav class="navbar">
             <div class="logo">
