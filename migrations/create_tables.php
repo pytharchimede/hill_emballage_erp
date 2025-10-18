@@ -4,7 +4,7 @@
  * Migration pour créer toutes les tables HILL EMBALLAGE
  */
 
-require_once '../backend/config/database.php';
+require_once __DIR__ . '/../backend/config/database.php';
 
 echo "<h2>Création des tables HILL EMBALLAGE</h2>\n";
 echo "<style>body{font-family:Arial,sans-serif;margin:20px;} .success{color:green;} .error{color:red;} .info{color:blue;}</style>\n";

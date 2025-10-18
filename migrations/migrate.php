@@ -4,7 +4,7 @@
  * Migration directe pour HILL EMBALLAGE
  */
 
-require_once '../backend/config/database.php';
+require_once __DIR__ . '/../backend/config/database.php';
 
 // Vérifier le paramètre migrate ou forcer l'exécution
 if (!isset($_GET['migrate']) && !isset($_GET['force'])) {

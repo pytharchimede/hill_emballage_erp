@@ -192,6 +192,10 @@ $stmt = $db->prepare($sql);
 $stmt->execute($params);
 $clients = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+// Détecter les colonnes optionnelles pour l'affichage (type et dépôt)
+$hasClientType = columnExists($db, 'clients', 'client_type') || columnExists($db, 'clients', 'type_client');
+$hasDepotJoin = strpos($joins, 'depots') !== false;
+
 $totalPages = ceil($totalClients / $limit);
 
 $pageTitle = 'Gestion des Clients';
@@ -220,11 +224,11 @@ include 'includes/header.php';
         <form method="GET" class="filters-form">
             <div class="filter-group">
                 <input type="text" name="search" placeholder="Rechercher un client..."
-                    value="<?= htmlspecialchars($search) ?>" class="search-input">
+                    value="<?= htmlspecialchars($search) ?>" class="form-control search-input">
             </div>
 
             <div class="filter-group">
-                <select name="filter" class="filter-select">
+                <select name="filter" class="form-select filter-select">
                     <option value="all" <?= $filter === 'all' ? 'selected' : '' ?>>Tous les types</option>
                     <option value="particulier" <?= $filter === 'particulier' ? 'selected' : '' ?>>Particuliers</option>
                     <option value="professionnel" <?= $filter === 'professionnel' ? 'selected' : '' ?>>Professionnels</option>
@@ -258,8 +262,10 @@ include 'includes/header.php';
                     <th>Client</th>
                     <th>Contact</th>
                     <th>Adresse</th>
-                    <th>Type</th>
-                    <?php if ($userRole === 'admin'): ?>
+                    <?php if ($hasClientType): ?>
+                        <th>Type</th>
+                    <?php endif; ?>
+                    <?php if ($userRole === 'admin' && $hasDepotJoin): ?>
                         <th>Dépôt</th>
                     <?php endif; ?>
                     <th>Créé le</th>
@@ -269,7 +275,13 @@ include 'includes/header.php';
             <tbody>
                 <?php if (empty($clients)): ?>
                     <tr>
-                        <td colspan="<?= $userRole === 'admin' ? '7' : '6' ?>" class="no-data">
+                        <?php
+                        // Colonnes toujours présentes: Client, Contact, Adresse, Créé le, Actions = 5
+                        $cols = 5;
+                        if ($hasClientType) $cols++; // Type
+                        if ($userRole === 'admin' && $hasDepotJoin) $cols++; // Dépôt
+                        ?>
+                        <td colspan="<?= $cols ?>" class="no-data">
                             <i class="fas fa-users"></i>
                             Aucun client trouvé
                         </td>
@@ -315,20 +327,26 @@ include 'includes/header.php';
                                     <?= htmlspecialchars(trim($pc . ' ' . $city)) ?>
                                 </div>
                             </td>
-                            <td>
-                                <span class="type-badge type-<?= $client['client_type'] ?>">
-                                    <?= ucfirst($client['client_type']) ?>
-                                </span>
-                            </td>
-                            <?php if ($userRole === 'admin'): ?>
-                                <td><?= htmlspecialchars($client['depot_nom']) ?></td>
+                            <?php if ($hasClientType): ?>
+                                <?php
+                                $ctype = $client['client_type'] ?? ($client['type_client'] ?? null);
+                                $ctypeSafe = $ctype ? preg_replace('/[^a-z_\-]/i', '', strtolower($ctype)) : 'inconnu';
+                                ?>
+                                <td>
+                                    <span class="type-badge type-<?= htmlspecialchars($ctypeSafe) ?>">
+                                        <?= htmlspecialchars($ctype ? ucfirst($ctype) : '—') ?>
+                                    </span>
+                                </td>
+                            <?php endif; ?>
+                            <?php if ($userRole === 'admin' && $hasDepotJoin): ?>
+                                <td><?= htmlspecialchars($client['depot_nom'] ?? '') ?></td>
                             <?php endif; ?>
                             <td><?= date('d/m/Y', strtotime($client['created_at'])) ?></td>
                             <td>
                                 <div class="actions">
                                     <?php if (hasPermission('clients_update')): ?>
                                         <button class="btn-icon btn-primary"
-                                            onclick="editClient(<?= htmlspecialchars(json_encode($client)) ?>)">
+                                            onclick='editClient(<?= json_encode($client, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>)'>
                                             <i class="fas fa-edit"></i>
                                         </button>
                                     <?php endif; ?>
@@ -361,151 +379,147 @@ include 'includes/header.php';
     <?php endif; ?>
 </div>
 
-<!-- Modal Nouveau Client -->
+<!-- Modal Nouveau Client (Bootstrap) -->
 <?php if (hasPermission('clients_create')): ?>
-    <div id="addClientModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3><i class="fas fa-user-plus"></i> Nouveau Client</h3>
-                <button class="close-modal" onclick="closeModal('addClientModal')">&times;</button>
+    <div class="modal fade" id="addClientModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-user-plus"></i> Nouveau Client</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form method="POST" class="client-form">
+                    <input type="hidden" name="action" value="create">
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="name">Nom *</label>
+                            <input type="text" id="name" name="name" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="client_type">Type *</label>
+                            <select id="client_type" name="client_type" required>
+                                <option value="particulier">Particulier</option>
+                                <option value="professionnel">Professionnel</option>
+                                <option value="revendeur">Revendeur</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="email">Email</label>
+                            <input type="email" id="email" name="email">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="phone">Téléphone</label>
+                            <input type="tel" id="phone" name="phone">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="company">Entreprise</label>
+                        <input type="text" id="company" name="company">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="address">Adresse *</label>
+                        <textarea id="address" name="address" rows="2" required></textarea>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="postal_code">Code Postal *</label>
+                            <input type="text" id="postal_code" name="postal_code" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="city">Ville *</label>
+                            <input type="text" id="city" name="city" required>
+                        </div>
+                    </div>
+
+                    <div class="form-actions d-flex justify-content-end gap-2 p-3 border-top">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                        <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Créer le Client</button>
+                    </div>
+                </form>
             </div>
-            <form method="POST" class="client-form">
-                <input type="hidden" name="action" value="create">
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="name">Nom *</label>
-                        <input type="text" id="name" name="name" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="client_type">Type *</label>
-                        <select id="client_type" name="client_type" required>
-                            <option value="particulier">Particulier</option>
-                            <option value="professionnel">Professionnel</option>
-                            <option value="revendeur">Revendeur</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="email">Email</label>
-                        <input type="email" id="email" name="email">
-                    </div>
-
-                    <div class="form-group">
-                        <label for="phone">Téléphone</label>
-                        <input type="tel" id="phone" name="phone">
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label for="company">Entreprise</label>
-                    <input type="text" id="company" name="company">
-                </div>
-
-                <div class="form-group">
-                    <label for="address">Adresse *</label>
-                    <textarea id="address" name="address" rows="2" required></textarea>
-                </div>
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="postal_code">Code Postal *</label>
-                        <input type="text" id="postal_code" name="postal_code" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="city">Ville *</label>
-                        <input type="text" id="city" name="city" required>
-                    </div>
-                </div>
-
-                <div class="form-actions">
-                    <button type="button" class="btn btn-secondary" onclick="closeModal('addClientModal')">
-                        Annuler
-                    </button>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-save"></i> Créer le Client
-                    </button>
-                </div>
-            </form>
         </div>
     </div>
 <?php endif; ?>
 
-<!-- Modal Édition Client -->
+<!-- Modal Édition Client (Bootstrap) -->
 <?php if (hasPermission('clients_update')): ?>
-    <div id="editClientModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3><i class="fas fa-edit"></i> Modifier Client</h3>
-                <button class="close-modal" onclick="closeModal('editClientModal')">&times;</button>
+    <div class="modal fade" id="editClientModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-edit"></i> Modifier Client</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form method="POST" class="client-form" id="editClientForm">
+                    <input type="hidden" name="action" value="update">
+                    <input type="hidden" name="id" id="edit_id">
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="edit_name">Nom *</label>
+                            <input type="text" id="edit_name" name="name" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="edit_client_type">Type *</label>
+                            <select id="edit_client_type" name="client_type" required>
+                                <option value="particulier">Particulier</option>
+                                <option value="professionnel">Professionnel</option>
+                                <option value="revendeur">Revendeur</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="edit_email">Email</label>
+                            <input type="email" id="edit_email" name="email">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="edit_phone">Téléphone</label>
+                            <input type="tel" id="edit_phone" name="phone">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="edit_company">Entreprise</label>
+                        <input type="text" id="edit_company" name="company">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="edit_address">Adresse *</label>
+                        <textarea id="edit_address" name="address" rows="2" required></textarea>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="edit_postal_code">Code Postal *</label>
+                            <input type="text" id="edit_postal_code" name="postal_code" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="edit_city">Ville *</label>
+                            <input type="text" id="edit_city" name="city" required>
+                        </div>
+                    </div>
+
+                    <div class="form-actions d-flex justify-content-end gap-2 p-3 border-top">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                        <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Mettre à jour</button>
+                    </div>
+                </form>
             </div>
-            <form method="POST" class="client-form" id="editClientForm">
-                <input type="hidden" name="action" value="update">
-                <input type="hidden" name="id" id="edit_id">
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="edit_name">Nom *</label>
-                        <input type="text" id="edit_name" name="name" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="edit_client_type">Type *</label>
-                        <select id="edit_client_type" name="client_type" required>
-                            <option value="particulier">Particulier</option>
-                            <option value="professionnel">Professionnel</option>
-                            <option value="revendeur">Revendeur</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="edit_email">Email</label>
-                        <input type="email" id="edit_email" name="email">
-                    </div>
-
-                    <div class="form-group">
-                        <label for="edit_phone">Téléphone</label>
-                        <input type="tel" id="edit_phone" name="phone">
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label for="edit_company">Entreprise</label>
-                    <input type="text" id="edit_company" name="company">
-                </div>
-
-                <div class="form-group">
-                    <label for="edit_address">Adresse *</label>
-                    <textarea id="edit_address" name="address" rows="2" required></textarea>
-                </div>
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="edit_postal_code">Code Postal *</label>
-                        <input type="text" id="edit_postal_code" name="postal_code" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="edit_city">Ville *</label>
-                        <input type="text" id="edit_city" name="city" required>
-                    </div>
-                </div>
-
-                <div class="form-actions">
-                    <button type="button" class="btn btn-secondary" onclick="closeModal('editClientModal')">
-                        Annuler
-                    </button>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-save"></i> Mettre à jour
-                    </button>
-                </div>
-            </form>
         </div>
     </div>
 <?php endif; ?>
@@ -727,50 +741,6 @@ include 'includes/header.php';
         background: #f8f9fa;
     }
 
-    /* Modal Styles */
-    .modal {
-        display: none;
-        position: fixed;
-        z-index: 1000;
-        left: 0;
-        top: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.5);
-    }
-
-    .modal-content {
-        background: white;
-        margin: 5% auto;
-        padding: 0;
-        border-radius: 15px;
-        width: 90%;
-        max-width: 600px;
-        max-height: 90vh;
-        overflow-y: auto;
-    }
-
-    .modal-header {
-        padding: 1.5rem;
-        border-bottom: 1px solid #eee;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-
-    .modal-header h3 {
-        margin: 0;
-        color: #333;
-    }
-
-    .close-modal {
-        background: none;
-        border: none;
-        font-size: 2rem;
-        cursor: pointer;
-        color: #999;
-    }
-
     .client-form {
         padding: 1.5rem;
     }
@@ -855,23 +825,31 @@ include 'includes/header.php';
 
 <script>
     function openModal(modalId) {
-        document.getElementById(modalId).style.display = 'block';
-    }
-
-    function closeModal(modalId) {
-        document.getElementById(modalId).style.display = 'none';
+        const modalEl = document.getElementById(modalId);
+        if (!modalEl) return;
+        const m = new bootstrap.Modal(modalEl);
+        m.show();
     }
 
     function editClient(client) {
+        // Normaliser les propriétés selon schéma
+        const name = client.name || [client.nom, client.prenom || client.prenoms].filter(Boolean).join(' ').trim();
+        const phone = client.phone || client.telephone || '';
+        const address = client.address || client.adresse || '';
+        const city = client.city || client.zone || '';
+        const postal = client.postal_code || '';
+        const company = client.company || client.entreprise || '';
+        const ctype = client.client_type || client.type_client || '';
+
         document.getElementById('edit_id').value = client.id;
-        document.getElementById('edit_name').value = client.name;
+        document.getElementById('edit_name').value = name || '';
         document.getElementById('edit_email').value = client.email || '';
-        document.getElementById('edit_phone').value = client.phone || '';
-        document.getElementById('edit_address').value = client.address;
-        document.getElementById('edit_city').value = client.city;
-        document.getElementById('edit_postal_code').value = client.postal_code;
-        document.getElementById('edit_company').value = client.company || '';
-        document.getElementById('edit_client_type').value = client.client_type;
+        document.getElementById('edit_phone').value = phone;
+        document.getElementById('edit_address').value = address;
+        document.getElementById('edit_city').value = city;
+        document.getElementById('edit_postal_code').value = postal;
+        document.getElementById('edit_company').value = company;
+        if (ctype) document.getElementById('edit_client_type').value = ctype;
 
         openModal('editClientModal');
     }

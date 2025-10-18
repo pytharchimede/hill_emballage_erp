@@ -23,8 +23,8 @@ $dbConfigPath = realpath(ROOT_PATH . '/../backend/config/database.php');
 if ($dbConfigPath && file_exists($dbConfigPath)) {
     require_once $dbConfigPath;
 } else {
-    // Fallback relatif (en cas d'exécution atypique)
-    require_once '../backend/config/database.php';
+    // Fallback absolu basé sur le chemin du fichier courant
+    require_once dirname(__DIR__, 2) . '/backend/config/database.php';
 }
 
 // Configuration de l'application
