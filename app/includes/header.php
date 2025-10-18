@@ -336,34 +336,34 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
 
     <style>
-        /* Fallback minimal si Bootstrap CSS n'est pas chargé: cache les modals par défaut */
-        .modal {
+        /* Fallback minimal si Bootstrap CSS n'est pas chargé: scoped pour éviter les conflits */
+        body.no-bs-css .modal {
             display: none;
             position: fixed;
-            z-index: 1050;
+            z-index: 1055;
             inset: 0;
             width: 100%;
             height: 100%;
             background: rgba(0, 0, 0, 0.5);
         }
 
-        .modal.show {
+        body.no-bs-css .modal.show {
             display: block;
         }
 
-        .modal .modal-dialog {
+        body.no-bs-css .modal .modal-dialog {
             position: relative;
             margin: 1.75rem auto;
             max-width: 900px;
         }
 
-        .modal .modal-content {
+        body.no-bs-css .modal .modal-content {
             background: #fff;
             border-radius: 0.5rem;
             overflow: hidden;
         }
 
-        .btn-close {
+        body.no-bs-css .btn-close {
             border: 0;
             background: transparent;
             width: 1em;
@@ -373,47 +373,58 @@
     </style>
 
     <script>
-        // Fallback JS si Bootstrap JS indisponible: bascule simple d'affichage des modals
         (function() {
-            if (window.bootstrap && window.bootstrap.Modal) {
-                return;
+            // Détecter si Bootstrap CSS est appliqué (z-index attendu >= 1055 sur .modal)
+            var probe = document.createElement('div');
+            probe.className = 'modal';
+            probe.style.position = 'absolute';
+            probe.style.visibility = 'hidden';
+            document.body.appendChild(probe);
+            var z = parseInt(window.getComputedStyle(probe).zIndex || '0', 10);
+            document.body.removeChild(probe);
+            var hasBootstrapCss = z >= 1055;
+            if (!hasBootstrapCss) {
+                document.body.classList.add('no-bs-css');
             }
 
-            function showModal(id) {
-                var el = document.getElementById(id);
-                if (!el) return;
-                el.classList.add('show');
-                el.style.display = 'block';
-                el.setAttribute('aria-modal', 'true');
-                el.removeAttribute('aria-hidden');
-            }
+            // Fallback JS si Bootstrap JS indisponible: bascule simple d'affichage des modals
+            if (!(window.bootstrap && window.bootstrap.Modal)) {
+                function showModal(id) {
+                    var el = document.getElementById(id);
+                    if (!el) return;
+                    document.body.classList.add('no-bs-css');
+                    el.classList.add('show');
+                    el.style.display = 'block';
+                    el.setAttribute('aria-modal', 'true');
+                    el.removeAttribute('aria-hidden');
+                }
 
-            function hideModal(el) {
-                el.classList.remove('show');
-                el.style.display = 'none';
-                el.removeAttribute('aria-modal');
-                el.setAttribute('aria-hidden', 'true');
+                function hideModal(el) {
+                    el.classList.remove('show');
+                    el.style.display = 'none';
+                    el.removeAttribute('aria-modal');
+                    el.setAttribute('aria-hidden', 'true');
+                }
+                window.__fallbackShowModal = showModal;
+                document.addEventListener('click', function(e) {
+                    var btn = e.target.closest('[data-bs-toggle="modal"]');
+                    if (btn) {
+                        var target = btn.getAttribute('data-bs-target');
+                        if (target && target.startsWith('#')) {
+                            e.preventDefault();
+                            showModal(target.substring(1));
+                        }
+                    }
+                    var closeBtn = e.target.closest('[data-bs-dismiss="modal"], .btn-close');
+                    if (closeBtn) {
+                        var modal = closeBtn.closest('.modal');
+                        if (modal) {
+                            e.preventDefault();
+                            hideModal(modal);
+                        }
+                    }
+                });
             }
-            window.__fallbackShowModal = showModal;
-            // wiring des boutons data-bs-toggle
-            document.addEventListener('click', function(e) {
-                var btn = e.target.closest('[data-bs-toggle="modal"]');
-                if (btn) {
-                    var target = btn.getAttribute('data-bs-target');
-                    if (target && target.startsWith('#')) {
-                        e.preventDefault();
-                        showModal(target.substring(1));
-                    }
-                }
-                var closeBtn = e.target.closest('[data-bs-dismiss="modal"], .btn-close');
-                if (closeBtn) {
-                    var modal = closeBtn.closest('.modal');
-                    if (modal) {
-                        e.preventDefault();
-                        hideModal(modal);
-                    }
-                }
-            });
         })();
     </script>
 
