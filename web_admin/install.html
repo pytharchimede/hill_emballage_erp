@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Installation - HILL EMBALLAGE</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #2C3E50 0%, #34495E 100%);
+            color: white;
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .install-container {
+            background: white;
+            color: #2C3E50;
+            border-radius: 16px;
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+        }
+        
+        .logo {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .logo h1 {
+            font-size: 2.5rem;
+            margin: 0;
+            color: #FFC107;
+        }
+        
+        .progress {
+            background: #ECF0F1;
+            border-radius: 10px;
+            height: 10px;
+            margin: 20px 0;
+            overflow: hidden;
+        }
+        
+        .progress-bar {
+            background: linear-gradient(90deg, #FFC107, #FF9800);
+            height: 100%;
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+        
+        .step {
+            margin: 15px 0;
+            padding: 15px;
+            background: #F8F9FA;
+            border-radius: 8px;
+            border-left: 4px solid #FFC107;
+        }
+        
+        .step.success {
+            border-left-color: #27AE60;
+            background: #E8F5E8;
+        }
+        
+        .step.error {
+            border-left-color: #E74C3C;
+            background: #FDEDED;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #FFC107, #FF9800);
+            color: #2C3E50;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+            margin-top: 20px;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(255, 193, 7, 0.3);
+        }
+        
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .status {
+            margin: 10px 0;
+            font-weight: 500;
+        }
+        
+        .success-message {
+            background: #E8F5E8;
+            border: 1px solid #27AE60;
+            color: #27AE60;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+            text-align: center;
+        }
+        
+        .error-message {
+            background: #FDEDED;
+            border: 1px solid #E74C3C;
+            color: #E74C3C;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="install-container">
+        <div class="logo">
+            <h1>📦 HILL EMBALLAGE</h1>
+            <p>Installation de la base de données</p>
+        </div>
+        
+        <div class="progress">
+            <div class="progress-bar" id="progress-bar"></div>
+        </div>
+        
+        <div id="installation-steps">
+            <div class="step" id="step-1">
+                <strong>Étape 1:</strong> Vérification de la connexion à la base de données
+                <div class="status" id="status-1">En attente...</div>
+            </div>
+            
+            <div class="step" id="step-2">
+                <strong>Étape 2:</strong> Création de la base de données
+                <div class="status" id="status-2">En attente...</div>
+            </div>
+            
+            <div class="step" id="step-3">
+                <strong>Étape 3:</strong> Création des tables
+                <div class="status" id="status-3">En attente...</div>
+            </div>
+            
+            <div class="step" id="step-4">
+                <strong>Étape 4:</strong> Insertion des données de test
+                <div class="status" id="status-4">En attente...</div>
+            </div>
+        </div>
+        
+        <button class="btn" id="install-btn" onclick="startInstallation()">
+            🚀 Commencer l'installation
+        </button>
+        
+        <div id="result-message"></div>
+    </div>
+
+    <script>
+        let currentStep = 0;
+        const totalSteps = 4;
+        
+        function updateProgress(step) {
+            const percentage = (step / totalSteps) * 100;
+            document.getElementById('progress-bar').style.width = percentage + '%';
+        }
+        
+        function updateStepStatus(stepNumber, status, message) {
+            const step = document.getElementById(`step-${stepNumber}`);
+            const statusEl = document.getElementById(`status-${stepNumber}`);
+            
+            statusEl.textContent = message;
+            
+            if (status === 'success') {
+                step.classList.add('success');
+            } else if (status === 'error') {
+                step.classList.add('error');
+            }
+        }
+        
+        async function executeStep(stepNumber, url, message) {
+            try {
+                updateStepStatus(stepNumber, 'running', 'En cours...');
+                
+                const response = await fetch(url);
+                const text = await response.text();
+                
+                if (response.ok) {
+                    updateStepStatus(stepNumber, 'success', 'Terminé ✓');
+                    updateProgress(stepNumber);
+                    return true;
+                } else {
+                    throw new Error(`Erreur HTTP: ${response.status}`);
+                }
+            } catch (error) {
+                updateStepStatus(stepNumber, 'error', `Erreur: ${error.message}`);
+                return false;
+            }
+        }
+        
+        async function startInstallation() {
+            const btn = document.getElementById('install-btn');
+            const resultDiv = document.getElementById('result-message');
+            
+            btn.disabled = true;
+            btn.textContent = '⏳ Installation en cours...';
+            resultDiv.innerHTML = '';
+            
+            try {
+                // Étape 1: Vérification de la connexion
+                const step1 = await executeStep(1, '../backend/config/database.php', 'Vérification...');
+                if (!step1) throw new Error('Impossible de se connecter à la base de données');
+                
+                // Étape 2: Création de la base de données (incluse dans les migrations)
+                updateStepStatus(2, 'success', 'Base de données prête ✓');
+                updateProgress(2);
+                
+                // Étape 3: Création des tables
+                const step3 = await executeStep(3, '../backend/migrations/create_tables.php?migrate=1', 'Création des tables...');
+                if (!step3) throw new Error('Erreur lors de la création des tables');
+                
+                // Ajout de la table d'historique des stocks
+                await fetch('../backend/migrations/add_stock_history.php?migrate_stock_history=1');
+                
+                // Étape 4: Insertion des données de test
+                const step4 = await executeStep(4, '../backend/migrations/seed_data.php?seed=1', 'Insertion des données...');
+                if (!step4) throw new Error('Erreur lors de l\'insertion des données');
+                
+                // Installation réussie
+                resultDiv.innerHTML = `
+                    <div class="success-message">
+                        <h3>🎉 Installation terminée avec succès !</h3>
+                        <p>La base de données HILL EMBALLAGE a été créée et initialisée.</p>
+                        <p><strong>Comptes de démonstration créés :</strong></p>
+                        <ul style="text-align: left; margin: 10px 0;">
+                            <li><strong>Admin:</strong> admin / admin123</li>
+                            <li><strong>Comptable:</strong> comptable1 / compta123</li>
+                            <li><strong>Livreur:</strong> livreur1 / livreur123</li>
+                            <li><strong>Vendeur:</strong> vendeur1 / vendeur123</li>
+                        </ul>
+                        <a href="login.html" style="display: inline-block; background: #FFC107; color: #2C3E50; padding: 10px 20px; text-decoration: none; border-radius: 6px; margin-top: 10px; font-weight: 600;">
+                            🚀 Accéder à l'application
+                        </a>
+                    </div>
+                `;
+                
+                btn.style.display = 'none';
+                
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="error-message">
+                        <h3>❌ Erreur d'installation</h3>
+                        <p>${error.message}</p>
+                        <p>Veuillez vérifier la configuration de votre serveur et réessayer.</p>
+                    </div>
+                `;
+                
+                btn.disabled = false;
+                btn.textContent = '🔄 Réessayer l\'installation';
+            }
+        }
+        
+        // Vérification automatique au chargement
+        window.addEventListener('load', async () => {
+            try {
+                const response = await fetch('../backend/config/database.php');
+                if (response.ok) {
+                    updateStepStatus(1, 'success', 'Connexion disponible ✓');
+                } else {
+                    updateStepStatus(1, 'error', 'Problème de connexion');
+                }
+            } catch (error) {
+                updateStepStatus(1, 'error', 'Serveur inaccessible');
+            }
+        });
+    </script>
+</body>
+</html>

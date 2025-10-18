@@ -1,0 +1,89 @@
+name: hill_emballage
+description: Application mobile pour la gestion des dépôts-ventes, crédits clients et stock d'emballages HILL.
+publish_to: "none"
+
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # HTTP client
+  http: ^1.1.0
+
+  # State management
+  provider: ^6.1.1
+
+  # Local storage
+  shared_preferences: ^2.2.2
+
+  # Database locale
+  sqflite: ^2.3.0
+  path: ^1.8.3
+
+  # UI et navigation
+  flutter_screenutil: ^5.9.0
+  cupertino_icons: ^1.0.6
+
+  # Formulaires et validation
+  flutter_form_builder: ^9.1.1
+
+  # Gestion des images
+  image_picker: ^1.0.4
+  cached_network_image: ^3.3.0
+
+  # QR Code
+  qr_code_scanner: ^1.0.1
+  qr_flutter: ^4.1.0
+
+  # Intl et formatage
+  intl: ^0.18.1
+
+  # Permissions
+  permission_handler: ^11.0.1
+
+  # Loading et animations
+  flutter_spinkit: ^5.2.0
+  animate_do: ^3.1.2
+
+  # Charts et graphiques
+  fl_chart: ^0.64.0
+
+  # Notifications locales
+  flutter_local_notifications: ^16.1.0
+
+  # Partage de fichiers
+  share_plus: ^7.2.1
+
+  # PDF generation
+  pdf: ^3.10.4
+  printing: ^5.11.0
+
+  # Connectivité
+  connectivity_plus: ^5.0.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/
+    - assets/icons/
+
+  fonts:
+    - family: Poppins
+      fonts:
+        - asset: assets/fonts/Poppins-Regular.ttf
+        - asset: assets/fonts/Poppins-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Poppins-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Poppins-Bold.ttf
+          weight: 700
