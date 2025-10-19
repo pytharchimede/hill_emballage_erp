@@ -9,6 +9,9 @@
     <!-- FontAwesome pour les icônes -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 
+    <!-- Bootstrap CSS (pour modals/popups et composants) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+
     <!-- CSS personnalisé -->
     <link rel="stylesheet" href="<?= ASSETS_URL ?>/css/app.css">
 
@@ -36,6 +39,15 @@
             align-items: center;
         }
 
+        .navbar .menu-toggle {
+            background: transparent;
+            border: 0;
+            color: #333;
+            font-size: 1.5rem;
+            display: none;
+            /* visible en mobile via media query */
+        }
+
         .navbar .logo {
             font-size: 1.5rem;
             font-weight: bold;
@@ -56,7 +68,7 @@
             font-weight: 500;
         }
 
-        .container {
+        .app-container {
             display: flex;
             min-height: calc(100vh - 80px);
         }
@@ -301,8 +313,51 @@
             color: #2ed573;
         }
 
+        .menu-backdrop {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.4);
+            z-index: 1040;
+        }
+
+        @media (max-width: 992px) {
+            .navbar .menu-toggle {
+                display: inline-flex;
+            }
+
+            .app-container {
+                position: relative;
+            }
+
+            .sidebar {
+                position: fixed;
+                top: 64px;
+                /* approx hauteur navbar */
+                left: 0;
+                height: calc(100vh - 64px);
+                transform: translateX(-100%);
+                transition: transform .25s ease;
+                z-index: 1050;
+                /* sous les modals (1070) */
+                padding-top: 1rem;
+            }
+
+            body.menu-open .sidebar {
+                transform: translateX(0%);
+            }
+
+            body.menu-open .menu-backdrop {
+                display: block;
+            }
+
+            .main-content {
+                padding: 1rem;
+            }
+        }
+
         @media (max-width: 768px) {
-            .container {
+            .app-container {
                 flex-direction: column;
             }
 
@@ -327,9 +382,57 @@
 </head>
 
 <body class="role-<?= $_SESSION['user_role'] ?? 'guest' ?>">
+    <!-- jQuery (certaines pages peuvent l'utiliser) -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
+    <!-- Bootstrap JS (popups/modals) -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+
+    <style>
+        /* Fallback minimal si Bootstrap CSS n'est pas chargé: scoped pour éviter les conflits */
+        body.no-bs-css .modal {
+            display: none;
+            position: fixed;
+            z-index: 1070;
+            /* au-dessus du backdrop fallback (1060) */
+            inset: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        body.no-bs-css .modal.show {
+            display: block;
+        }
+
+        body.no-bs-css .modal .modal-dialog {
+            position: relative;
+            margin: 1.75rem auto;
+            max-width: 1000px;
+        }
+
+        body.no-bs-css .modal .modal-content {
+            background: #fff;
+            border-radius: 0.75rem;
+            overflow: hidden;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.18);
+        }
+
+        body.no-bs-css .btn-close {
+            border: 0;
+            background: transparent;
+            width: 1em;
+            height: 1em;
+            opacity: .5;
+        }
+    </style>
+
+    <script src="<?= ASSETS_URL ?>/js/fallback.js"></script>
+    <script src="<?= ASSETS_URL ?>/js/menu.js"></script>
 
     <?php if (isLoggedIn()): ?>
         <nav class="navbar">
+            <button class="menu-toggle" aria-label="Ouvrir le menu" aria-controls="sidebar" aria-expanded="false">
+                <i class="fas fa-bars"></i>
+            </button>
             <div class="logo">
                 <i class="fas fa-boxes"></i> <?= APP_NAME ?>
             </div>
@@ -344,8 +447,8 @@
             </div>
         </nav>
 
-        <div class="container">
-            <aside class="sidebar">
+        <div class="app-container">
+            <aside class="sidebar" id="sidebar" aria-label="Menu principal">
                 <?php
                 $currentPath = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH);
                 $currentPage = basename($currentPath ?: ($_SERVER['PHP_SELF'] ?? ''));
@@ -361,6 +464,7 @@
                     </a>
                 <?php endforeach; ?>
             </aside>
+            <div class="menu-backdrop" data-menu-backdrop></div>
 
             <main class="main-content">
                 <?php

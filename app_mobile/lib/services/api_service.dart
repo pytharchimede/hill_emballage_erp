@@ -97,12 +97,10 @@ class ApiService {
   // Vérification de la connectivité
   static Future<bool> checkConnection() async {
     try {
-      final response = await http
-          .get(
-            Uri.parse('$baseUrl/auth.php'),
-            headers: {'Content-Type': 'application/json'},
-          )
-          .timeout(const Duration(seconds: 5));
+      final response = await http.get(
+        Uri.parse('$baseUrl/auth.php'),
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(const Duration(seconds: 5));
 
       return response.statusCode == 200 || response.statusCode == 401;
     } catch (e) {

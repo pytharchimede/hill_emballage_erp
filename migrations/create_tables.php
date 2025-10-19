@@ -4,7 +4,7 @@
  * Migration pour créer toutes les tables HILL EMBALLAGE
  */
 
-require_once '../backend/config/database.php';
+require_once __DIR__ . '/../backend/config/database.php';
 
 echo "<h2>Création des tables HILL EMBALLAGE</h2>\n";
 echo "<style>body{font-family:Arial,sans-serif;margin:20px;} .success{color:green;} .error{color:red;} .info{color:blue;}</style>\n";
@@ -26,6 +26,9 @@ try {
     echo "<p class='success'>✓ Connexion établie</p>\n";
 
     // Supprimer les tables existantes dans l'ordre inverse des dépendances
+    // Désactiver les contraintes pour éviter l'erreur 1451 (FK)
+    echo "<p class='info'>Suppression des tables existantes...</p>\n";
+    $conn->exec("SET FOREIGN_KEY_CHECKS=0");
     $dropTables = [
         "DROP TABLE IF EXISTS fidelity_points",
         "DROP TABLE IF EXISTS stock_transfers",
@@ -35,14 +38,19 @@ try {
         "DROP TABLE IF EXISTS stock",
         "DROP TABLE IF EXISTS produits",
         "DROP TABLE IF EXISTS clients",
+        "DROP TABLE IF EXISTS user_permissions",
         "DROP TABLE IF EXISTS users",
         "DROP TABLE IF EXISTS depots"
     ];
-
-    echo "<p class='info'>Suppression des tables existantes...</p>\n";
     foreach ($dropTables as $sql) {
-        $conn->exec($sql);
+        try {
+            $conn->exec($sql);
+        } catch (Exception $ex) {
+            echo "<p class='error'>Échec: " . htmlspecialchars($sql) . "<br>" . htmlspecialchars($ex->getMessage()) . "</p>\n";
+            // Continuer malgré tout pour tenter de nettoyer un maximum
+        }
     }
+    $conn->exec("SET FOREIGN_KEY_CHECKS=1");
     echo "<p class='success'>✓ Tables existantes supprimées</p>\n";
 
     // Création des tables
@@ -219,6 +227,20 @@ try {
     )";
     $conn->exec($sql);
     echo "<p class='success'>✓ Table fidelity_points créée</p>\n";
+
+    // Table user_permissions (overrides de droits)
+    $sql = "CREATE TABLE user_permissions (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        permission VARCHAR(100) NOT NULL,
+        allowed TINYINT(1) NOT NULL DEFAULT 1,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY uniq_user_perm (user_id, permission),
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )";
+    $conn->exec($sql);
+    echo "<p class='success'>✓ Table user_permissions créée</p>\n";
 
     echo "<hr><h3>Insertion des données de test</h3>\n";
 

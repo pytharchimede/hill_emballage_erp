@@ -498,6 +498,54 @@ body {
 
 .rounded { border-radius: var(--border-radius) !important; }
 .rounded-sm { border-radius: 0.2rem !important; }
+
+/* ===== MODALS (Z-INDEX & MODERN STYLE) ===== */
+.modal-backdrop {
+    z-index: 1060 !important;
+    background-color: rgba(0, 0, 0, 0.55);
+}
+.modal {
+    z-index: 1070 !important;
+}
+.modal-modern .modal-content {
+    border-radius: 14px;
+    border: 1px solid rgba(0,0,0,0.06);
+    box-shadow: 0 10px 40px rgba(0,0,0,0.18);
+    overflow: hidden;
+}
+.modal-modern .modal-header {
+    background: linear-gradient(135deg, var(--primary-light), #fff);
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+}
+.modal-modern .modal-title {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+}
+.modal-modern .modal-title i { color: var(--primary-dark); }
+.modal-modern .modal-body { padding-top: 1rem; padding-bottom: 1rem; }
+.modal-modern .modal-footer { border-top: 1px solid rgba(0,0,0,0.06); }
+
+/* Better checkbox grid in permission panels */
+#createPermGrid, #editPermGrid {
+    --col-min: 260px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(var(--col-min), 1fr));
+    gap: .5rem 1rem;
+}
+#createPermGrid .form-check-label, #editPermGrid .form-check-label {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    padding: .25rem .5rem;
+    border-radius: 8px;
+}
+#createPermGrid .form-check-input, #editPermGrid .form-check-input { margin-top: 0; }
+
+/* Ensure modal content is above sticky headers/sidebars */
+.modal-open .navbar, .modal-open .sidebar, .modal-open header {
+    z-index: 1000 !important;
+}
 .rounded-lg { border-radius: 0.5rem !important; }
 .rounded-circle { border-radius: 50% !important; }
 

@@ -4,7 +4,7 @@
  * Migration directe pour HILL EMBALLAGE
  */
 
-require_once '../backend/config/database.php';
+require_once __DIR__ . '/../backend/config/database.php';
 
 // Vérifier le paramètre migrate ou forcer l'exécution
 if (!isset($_GET['migrate']) && !isset($_GET['force'])) {
@@ -229,6 +229,18 @@ try {
     )";
     $conn->exec($sql);
     echo "<p class='success'>✓ Table fidelity_points créée</p>\n";
+
+    // Table user_permissions (overrides de droits)
+    $sql = "CREATE TABLE user_permissions (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        permission VARCHAR(100) NOT NULL,
+        allowed TINYINT(1) NOT NULL DEFAULT 1,
+        UNIQUE KEY uniq_user_perm (user_id, permission),
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )";
+    $conn->exec($sql);
+    echo "<p class='success'>✓ Table user_permissions créée</p>\n";
 
     echo "<hr><h3>Insertion des données de test</h3>\n";
 

@@ -131,7 +131,7 @@ include 'includes/header.php';
 <div class="page-header">
     <h1><i class="fas fa-box"></i> Produits</h1>
     <?php if (hasPermission('products_create')): ?>
-        <button class="btn" onclick="openModal('addProductModal')"><i class="fas fa-plus"></i> Nouveau produit</button>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addProductModal"><i class="fas fa-plus"></i> Nouveau produit</button>
     <?php endif; ?>
 </div>
 <?php if ($message): ?><div class="alert alert-<?= $messageType ?>"><?= htmlspecialchars($message) ?></div><?php endif; ?>
@@ -193,37 +193,61 @@ include 'includes/header.php';
 </div>
 
 <?php if (hasPermission('products_create')): ?>
-    <div class="card" id="addProductModal">
-        <h2>Ajouter un produit</h2>
-        <form method="post">
-            <input type="hidden" name="action" value="create" />
-            <div class="form-group"><label>Nom</label><input name="name" required /></div>
-            <div class="form-group"><label>Code</label><input name="code" required /></div>
-            <div class="form-group"><label>Unité</label><input name="unit" value="pièce" /></div>
-            <div class="form-group"><label>Prix unitaire</label><input name="price" type="number" step="0.01" required /></div>
-            <div class="form-group"><label>Prix crédit</label><input name="price_credit" type="number" step="0.01" /></div>
-            <div class="form-group"><label>Points fidélité</label><input name="points" type="number" value="1" /></div>
-            <div class="form-group"><label>Description</label><textarea name="description"></textarea></div>
-            <button class="btn btn-success" type="submit">Enregistrer</button>
-        </form>
+    <div class="modal fade" id="addProductModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-plus"></i> Ajouter un produit</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form method="post">
+                    <input type="hidden" name="action" value="create" />
+                    <div class="modal-body">
+                        <div class="form-group"><label>Nom</label><input class="form-control" name="name" required /></div>
+                        <div class="form-group"><label>Code</label><input class="form-control" name="code" required /></div>
+                        <div class="form-group"><label>Unité</label><input class="form-control" name="unit" value="pièce" /></div>
+                        <div class="form-group"><label>Prix unitaire</label><input class="form-control" name="price" type="number" step="0.01" required /></div>
+                        <div class="form-group"><label>Prix crédit</label><input class="form-control" name="price_credit" type="number" step="0.01" /></div>
+                        <div class="form-group"><label>Points fidélité</label><input class="form-control" name="points" type="number" value="1" /></div>
+                        <div class="form-group"><label>Description</label><textarea class="form-control" name="description"></textarea></div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                        <button class="btn btn-primary" type="submit">Enregistrer</button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
 <?php endif; ?>
 
 <?php if (hasPermission('products_update')): ?>
-    <div class="card" id="editProductModal">
-        <h2>Modifier le produit</h2>
-        <form method="post">
-            <input type="hidden" name="action" value="update" />
-            <input type="hidden" name="id" id="edit_id" />
-            <div class="form-group"><label>Nom</label><input name="name" id="edit_name" required /></div>
-            <div class="form-group"><label>Code</label><input name="code" id="edit_code" required /></div>
-            <div class="form-group"><label>Unité</label><input name="unit" id="edit_unit" /></div>
-            <div class="form-group"><label>Prix unitaire</label><input name="price" id="edit_price" type="number" step="0.01" required /></div>
-            <div class="form-group"><label>Prix crédit</label><input name="price_credit" id="edit_price_credit" type="number" step="0.01" /></div>
-            <div class="form-group"><label>Points fidélité</label><input name="points" id="edit_points" type="number" /></div>
-            <div class="form-group"><label>Description</label><textarea name="description" id="edit_description"></textarea></div>
-            <button class="btn btn-success" type="submit">Mettre à jour</button>
-        </form>
+    <div class="modal fade" id="editProductModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-edit"></i> Modifier le produit</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form method="post">
+                    <input type="hidden" name="action" value="update" />
+                    <input type="hidden" name="id" id="edit_id" />
+                    <div class="modal-body">
+                        <div class="form-group"><label>Nom</label><input class="form-control" name="name" id="edit_name" required /></div>
+                        <div class="form-group"><label>Code</label><input class="form-control" name="code" id="edit_code" required /></div>
+                        <div class="form-group"><label>Unité</label><input class="form-control" name="unit" id="edit_unit" /></div>
+                        <div class="form-group"><label>Prix unitaire</label><input class="form-control" name="price" id="edit_price" type="number" step="0.01" required /></div>
+                        <div class="form-group"><label>Prix crédit</label><input class="form-control" name="price_credit" id="edit_price_credit" type="number" step="0.01" /></div>
+                        <div class="form-group"><label>Points fidélité</label><input class="form-control" name="points" id="edit_points" type="number" /></div>
+                        <div class="form-group"><label>Description</label><textarea class="form-control" name="description" id="edit_description"></textarea></div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                        <button class="btn btn-primary" type="submit">Mettre à jour</button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
     <script>
         function fillEdit(id) {
@@ -237,6 +261,16 @@ include 'includes/header.php';
             document.getElementById('edit_price').value = tds[3].innerText.replace(/\s/g, '');
             document.getElementById('edit_price_credit').value = tds[4].innerText === '-' ? '' : tds[4].innerText.replace(/\s/g, '');
             document.getElementById('edit_points').value = tds[5].innerText.trim();
+            // Ouvrir le modal via Bootstrap ou fallback
+            const el = document.getElementById('editProductModal');
+            if (window.bootstrap && window.bootstrap.Modal) {
+                new bootstrap.Modal(el).show();
+            } else if (window.__fallbackShowModal) {
+                window.__fallbackShowModal('editProductModal');
+            } else {
+                el.classList.add('show');
+                el.style.display = 'block';
+            }
         }
     </script>
 <?php endif; ?>

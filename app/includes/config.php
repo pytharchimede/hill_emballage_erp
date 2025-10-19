@@ -23,8 +23,8 @@ $dbConfigPath = realpath(ROOT_PATH . '/../backend/config/database.php');
 if ($dbConfigPath && file_exists($dbConfigPath)) {
     require_once $dbConfigPath;
 } else {
-    // Fallback relatif (en cas d'exécution atypique)
-    require_once '../backend/config/database.php';
+    // Fallback absolu basé sur le chemin du fichier courant
+    require_once dirname(__DIR__, 2) . '/backend/config/database.php';
 }
 
 // Configuration de l'application
@@ -196,8 +196,28 @@ function getRolePermissions($role)
 function hasPermission($permission)
 {
     if (!isLoggedIn()) return false;
-    $userPermissions = getRolePermissions($_SESSION['user_role']);
-    return in_array($permission, $userPermissions);
+    static $overrideCache = null;
+    global $db;
+    // Charger les overrides de l'utilisateur une seule fois
+    if ($overrideCache === null) {
+        $overrideCache = [];
+        try {
+            $stmt = $db->prepare("SELECT permission, allowed FROM user_permissions WHERE user_id = ?");
+            $stmt->execute([$_SESSION['user_id']]);
+            while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                $overrideCache[$row['permission']] = (int)$row['allowed']; // 1 autorise, 0 refuse
+            }
+        } catch (Exception $e) {
+            // si la table n'existe pas encore, ignorer et retomber sur les droits du rôle
+        }
+    }
+    // Si override explicite existe, il prime (1 autorise, 0 refuse)
+    if (array_key_exists($permission, $overrideCache)) {
+        return $overrideCache[$permission] === 1;
+    }
+    // Sinon, retomber sur les permissions du rôle
+    $rolePerms = getRolePermissions($_SESSION['user_role']);
+    return in_array($permission, $rolePerms, true);
 }
 
 // Messages flash

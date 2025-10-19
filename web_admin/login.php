@@ -25,7 +25,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->execute([$email, $email]);
             $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            if ($user && password_verify($password, $user['password'])) {
+            $isValid = false;
+            if ($user) {
+                $stored = $user['password'];
+                // 1) Vérif standard (bcrypt)
+                if (password_verify($password, $stored)) {
+                    $isValid = true;
+                    // Rehash si l'algo par défaut a changé ou coût différent
+                    if (password_needs_rehash($stored, PASSWORD_DEFAULT)) {
+                        $newHash = password_hash($password, PASSWORD_DEFAULT);
+                        $reh = $db->prepare("UPDATE users SET password = ? WHERE id = ?");
+                        $reh->execute([$newHash, $user['id']]);
+                    }
+                } else {
+                    // 2) Compat héritée: mot de passe stocké en clair ou MD5
+                    $looksBcrypt = preg_match('/^\$2y\$\d{2}\$[A-Za-z0-9\.\/]{53}$/', (string)$stored) === 1;
+                    if (!$looksBcrypt) {
+                        $isPlain = hash_equals((string)$stored, (string)$password);
+                        $isMd5 = hash_equals((string)$stored, md5($password));
+                        if ($isPlain || $isMd5) {
+                            $isValid = true;
+                            // Migrer vers bcrypt immédiatement
+                            $newHash = password_hash($password, PASSWORD_DEFAULT);
+                            $reh = $db->prepare("UPDATE users SET password = ? WHERE id = ?");
+                            $reh->execute([$newHash, $user['id']]);
+                        }
+                    }
+                }
+            }
+
+            if ($user && $isValid) {
                 $_SESSION['user_id'] = $user['id'];
                 $_SESSION['user_role'] = $user['role'];
                 $_SESSION['user_name'] = $user['full_name'];
@@ -228,41 +257,35 @@ $pageTitle = 'Connexion - ' . APP_NAME;
             <div class="demo-account">
                 <div>
                     <span class="role">Administrateur</span><br>
-                    <span class="credentials">admin@hill.com / admin123</span>
+                    <span class="credentials">admin@hillemballage.ci / admin123</span>
                 </div>
-                <button class="quick-login" onclick="quickLogin('admin@hill.com', 'admin123')">Connexion rapide</button>
+                <button class="quick-login" data-email="admin@hillemballage.ci" data-password="admin123">Connexion rapide</button>
             </div>
             <div class="demo-account">
                 <div>
                     <span class="role">Vendeur</span><br>
-                    <span class="credentials">vendeur@hill.com / vendeur123</span>
+                    <span class="credentials">vendeur@hillemballage.ci / vendeur123</span>
                 </div>
-                <button class="quick-login" onclick="quickLogin('vendeur@hill.com', 'vendeur123')">Connexion rapide</button>
+                <button class="quick-login" data-email="vendeur@hillemballage.ci" data-password="vendeur123">Connexion rapide</button>
             </div>
             <div class="demo-account">
                 <div>
                     <span class="role">Livreur</span><br>
-                    <span class="credentials">livreur@hill.com / livreur123</span>
+                    <span class="credentials">livreur@hillemballage.ci / livreur123</span>
                 </div>
-                <button class="quick-login" onclick="quickLogin('livreur@hill.com', 'livreur123')">Connexion rapide</button>
+                <button class="quick-login" data-email="livreur@hillemballage.ci" data-password="livreur123">Connexion rapide</button>
             </div>
             <div class="demo-account">
                 <div>
                     <span class="role">Comptable</span><br>
-                    <span class="credentials">comptable@hill.com / comptable123</span>
+                    <span class="credentials">comptable@hillemballage.ci / comptable123</span>
                 </div>
-                <button class="quick-login" onclick="quickLogin('comptable@hill.com', 'comptable123')">Connexion rapide</button>
+                <button class="quick-login" data-email="comptable@hillemballage.ci" data-password="comptable123">Connexion rapide</button>
             </div>
         </div>
     </div>
 
-    <script>
-        function quickLogin(email, password) {
-            document.getElementById('email').value = email;
-            document.getElementById('password').value = password;
-            document.querySelector('form').submit();
-        }
-    </script>
+    <script src="<?= ASSETS_URL ?>/js/login.js"></script>
 </body>
 
 </html>

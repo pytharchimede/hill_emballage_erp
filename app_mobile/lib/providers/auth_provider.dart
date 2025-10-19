@@ -6,12 +6,49 @@ class AuthProvider extends ChangeNotifier {
   User? _user;
   bool _isAuthenticated = false;
   bool _isLoading = false;
+  bool _initialized = false;
   String? _errorMessage;
 
   User? get user => _user;
   bool get isAuthenticated => _isAuthenticated;
   bool get isLoading => _isLoading;
+  bool get isInitialized => _initialized;
   String? get errorMessage => _errorMessage;
+
+  AuthProvider() {
+    _initialize();
+  }
+
+  Future<void> _initialize() async {
+    // Initialisation au démarrage: vérifie le token une seule fois
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      await _verifyAndSetAuth();
+    } finally {
+      _initialized = true;
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> _verifyAndSetAuth() async {
+    try {
+      final response = await AuthService.verifyToken();
+
+      if (response['success'] == true) {
+        _user = User.fromJson(response['user']);
+        _isAuthenticated = true;
+      } else {
+        _user = null;
+        _isAuthenticated = false;
+      }
+    } catch (_) {
+      _user = null;
+      _isAuthenticated = false;
+    }
+  }
 
   // Connexion
   Future<bool> login(String email, String password) async {
@@ -53,18 +90,8 @@ class AuthProvider extends ChangeNotifier {
   // Vérification du token au démarrage
   Future<void> checkAuthStatus() async {
     _setLoading(true);
-
     try {
-      final response = await AuthService.verifyToken();
-
-      if (response['success'] == true) {
-        _user = User.fromJson(response['user']);
-        _isAuthenticated = true;
-      } else {
-        _isAuthenticated = false;
-      }
-    } catch (e) {
-      _isAuthenticated = false;
+      await _verifyAndSetAuth();
     } finally {
       _setLoading(false);
     }
