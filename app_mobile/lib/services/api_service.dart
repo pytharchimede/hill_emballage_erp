@@ -1,10 +1,11 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:flutter/foundation.dart';
 import 'http_client_stub.dart' if (dart.library.html) 'http_client_web.dart';
 
 class ApiService {
   // URL fournie par l'utilisateur
-  static const String baseUrl = 'http://app.hillemballage.ci/backend/requests';
+  static const String baseUrl = 'https://app.hillemballage.ci/backend/requests';
   static Map<String, String> _defaultHeaders = {
     'Content-Type': 'application/json',
   };
@@ -30,6 +31,10 @@ class ApiService {
             headers: headers,
           )
           .timeout(const Duration(seconds: 15));
+      if (kDebugMode) {
+        debugPrint('[GET] $baseUrl/$endpoint => ${response.statusCode}');
+        debugPrint(response.body);
+      }
 
       return _handleResponse(response);
     } catch (e) {
@@ -50,6 +55,12 @@ class ApiService {
             body: jsonEncode(data),
           )
           .timeout(const Duration(seconds: 15));
+      if (kDebugMode) {
+        debugPrint('[POST JSON] $baseUrl/$endpoint');
+        debugPrint('Body: ${jsonEncode(data)}');
+        debugPrint('=> ${response.statusCode}');
+        debugPrint(response.body);
+      }
 
       return _handleResponse(response);
     } catch (e) {
@@ -65,6 +76,7 @@ class ApiService {
     try {
       final formHeaders = Map<String, String>.from(_defaultHeaders);
       formHeaders['Content-Type'] = 'application/x-www-form-urlencoded';
+      formHeaders['Accept'] = 'application/json';
 
       final response = await _client
           .post(
@@ -73,6 +85,12 @@ class ApiService {
             body: Uri(queryParameters: data).query, // clé=valeur&...
           )
           .timeout(const Duration(seconds: 15));
+      if (kDebugMode) {
+        debugPrint('[POST FORM] $baseUrl/$endpoint');
+        debugPrint('Body: ${Uri(queryParameters: data).query}');
+        debugPrint('=> ${response.statusCode}');
+        debugPrint(response.body);
+      }
 
       return _handleResponse(response);
     } catch (e) {

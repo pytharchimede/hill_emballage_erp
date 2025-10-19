@@ -231,7 +231,7 @@ include 'includes/header.php';
                     <td><?= (int)$p['points_fidelite'] ?></td>
                     <td>
                         <?php if (hasPermission('products_update')): ?>
-                            <button class="btn" onclick="fillEdit(<?= (int)$p['id'] ?>)"><i class="fas fa-edit"></i></button>
+                            <button class="btn btn-edit-product" type="button" data-id="<?= (int)$p['id'] ?>"><i class="fas fa-edit"></i></button>
                         <?php endif; ?>
                         <?php if (hasPermission('products_delete')): ?>
                             <form method="post" style="display:inline" onsubmit="return confirm('Supprimer ce produit ?');">
@@ -318,19 +318,23 @@ include 'includes/header.php';
         </div>
     </div>
     <script>
-        function fillEdit(id) {
-            const row = [...document.querySelectorAll('table tbody tr')].find(tr => tr.querySelector('button.btn') && tr.querySelector('button.btn').getAttribute('onclick') === `fillEdit(${id})`);
-            if (!row) return;
+        // Ecouteur délégué compatible CSP (pas d'onclick inline)
+        document.addEventListener('click', function(e) {
+            const btn = e.target.closest('.btn-edit-product');
+            if (!btn) return;
+            const id = parseInt(btn.getAttribute('data-id'), 10);
+            const row = btn.closest('tr');
+            if (!row || !id) return;
             const tds = row.querySelectorAll('td');
             document.getElementById('edit_id').value = id;
-            // With image column at index 0, shift indexes by +1
-            document.getElementById('edit_code').value = tds[1].innerText.trim();
-            document.getElementById('edit_name').value = tds[2].innerText.trim();
-            document.getElementById('edit_unit').value = tds[3].innerText.trim();
-            document.getElementById('edit_price').value = tds[4].innerText.replace(/\s/g, '');
-            document.getElementById('edit_price_credit').value = tds[5].innerText === '-' ? '' : tds[5].innerText.replace(/\s/g, '');
-            document.getElementById('edit_points').value = tds[6].innerText.trim();
-            // Ouvrir le modal via Bootstrap ou fallback
+            // Colonnes: 0=image, 1=code, 2=nom, 3=unité, 4=prix, 5=prix crédit, 6=points
+            document.getElementById('edit_code').value = (tds[1]?.innerText || '').trim();
+            document.getElementById('edit_name').value = (tds[2]?.innerText || '').trim();
+            document.getElementById('edit_unit').value = (tds[3]?.innerText || '').trim();
+            document.getElementById('edit_price').value = (tds[4]?.innerText || '').replace(/\s/g, '');
+            const pc = (tds[5]?.innerText || '').trim();
+            document.getElementById('edit_price_credit').value = (pc === '-' ? '' : pc.replace(/\s/g, ''));
+            document.getElementById('edit_points').value = (tds[6]?.innerText || '').trim();
             const el = document.getElementById('editProductModal');
             if (window.bootstrap && window.bootstrap.Modal) {
                 new bootstrap.Modal(el).show();
@@ -340,7 +344,7 @@ include 'includes/header.php';
                 el.classList.add('show');
                 el.style.display = 'block';
             }
-        }
+        });
     </script>
 <?php endif; ?>
 
