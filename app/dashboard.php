@@ -131,7 +131,7 @@ include 'includes/header.php';
                     <i class="fas fa-euro-sign"></i>
                 </div>
                 <div class="stat-info">
-                    <h3><?= number_format($stats['revenue_today'] ?? 0, 0, ',', ' ') ?> €</h3>
+                    <h3><?= number_format($stats['revenue_today'] ?? 0, 0, ',', ' ') ?> FCFA</h3>
                     <p>Chiffre d'Affaires Aujourd'hui</p>
                 </div>
             </div>
@@ -215,7 +215,7 @@ include 'includes/header.php';
                     <i class="fas fa-euro-sign"></i>
                 </div>
                 <div class="stat-info">
-                    <h3><?= number_format($stats['my_revenue_today'] ?? 0, 0, ',', ' ') ?> €</h3>
+                    <h3><?= number_format($stats['my_revenue_today'] ?? 0, 0, ',', ' ') ?> FCFA</h3>
                     <p>Mon CA Aujourd'hui</p>
                 </div>
             </div>
@@ -353,7 +353,7 @@ include 'includes/header.php';
                     <i class="fas fa-euro-sign"></i>
                 </div>
                 <div class="stat-info">
-                    <h3><?= number_format($stats['revenue_today'] ?? 0, 0, ',', ' ') ?> €</h3>
+                    <h3><?= number_format($stats['revenue_today'] ?? 0, 0, ',', ' ') ?> FCFA</h3>
                     <p>CA Aujourd'hui</p>
                 </div>
             </div>
@@ -363,7 +363,7 @@ include 'includes/header.php';
                     <i class="fas fa-calendar-alt"></i>
                 </div>
                 <div class="stat-info">
-                    <h3><?= number_format($stats['revenue_month'] ?? 0, 0, ',', ' ') ?> €</h3>
+                    <h3><?= number_format($stats['revenue_month'] ?? 0, 0, ',', ' ') ?> FCFA</h3>
                     <p>CA ce Mois</p>
                 </div>
             </div>
