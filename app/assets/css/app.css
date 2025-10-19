@@ -546,6 +546,54 @@ body {
 .modal-open .navbar, .modal-open .sidebar, .modal-open header {
     z-index: 1000 !important;
 }
+
+/* ===== NAV + SIDEBAR: MOBILE COMPACT ===== */
+@media (max-width: 576px) {
+    .navbar { padding: .5rem 1rem !important; }
+    .navbar .logo { font-size: 1.1rem !important; }
+    .navbar .user-info { gap: .5rem !important; }
+    .navbar .user-role { padding: .25rem .5rem !important; font-size: .85rem; }
+    .sidebar { width: 80% !important; max-width: 280px; padding: 1rem 0 !important; }
+    .sidebar .menu-item { padding: .75rem 1rem !important; font-size: .95rem; }
+    .sidebar .menu-item i { width: 18px !important; margin-right: .5rem !important; }
+    .main-content { padding: 1rem !important; }
+}
+
+/* ===== RESPONSIVE DATA CARDS (replace tables on mobile) ===== */
+.data-cards { display: none; list-style: none; margin: 0; padding: 0; }
+.data-card {
+    background: var(--white);
+    border: 1px solid #eee;
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow);
+    padding: 1rem;
+    margin-bottom: .75rem;
+}
+.data-card .dc-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: .5rem; }
+.data-card .dc-title { font-weight: 600; color: var(--dark-color); }
+.data-card .dc-actions { display: inline-flex; gap: .5rem; }
+.data-card .dc-row { display: flex; justify-content: space-between; gap: 1rem; padding: .25rem 0; }
+.data-card .dc-label { color: #666; font-weight: 500; }
+.data-card .dc-value { color: var(--dark-color); font-weight: 600; text-align: right; }
+
+/* Show cards on mobile; hide tables */
+@media (max-width: 768px) {
+    .table:not(.no-cards), .table-responsive:not(.no-cards) { display: none !important; }
+    .data-cards { display: block; }
+}
+
+/* Clickable card affordance */
+.data-card.clickable { cursor: pointer; transition: box-shadow .2s ease, transform .2s ease; }
+.data-card.clickable:hover { box-shadow: 0 6px 20px rgba(0,0,0,.12); transform: translateY(-2px); }
+
+/* Badges mapping (fallback if Bootstrap not present) */
+.badge { display: inline-block; padding: .25rem .5rem; border-radius: 12px; font-size: .75rem; font-weight: 600; }
+.badge-success { background: #d4edda; color: #155724; }
+.badge-warning { background: #fff3cd; color: #856404; }
+.badge-danger  { background: #f8d7da; color: #721c24; }
+.badge-primary { background: #cfe2ff; color: #084298; }
+.badge-info    { background: #d1ecf1; color: #0c5460; }
+.badge-secondary { background: #e2e3e5; color: #41464b; }
 .rounded-lg { border-radius: 0.5rem !important; }
 .rounded-circle { border-radius: 50% !important; }
 

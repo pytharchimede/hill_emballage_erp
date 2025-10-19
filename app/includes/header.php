@@ -427,6 +427,7 @@
 
     <script src="<?= ASSETS_URL ?>/js/fallback.js"></script>
     <script src="<?= ASSETS_URL ?>/js/menu.js"></script>
+    <script src="<?= ASSETS_URL ?>/js/table2cards.js"></script>
 
     <?php if (isLoggedIn()): ?>
         <nav class="navbar">

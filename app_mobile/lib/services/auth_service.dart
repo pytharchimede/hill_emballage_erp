@@ -7,7 +7,8 @@ class AuthService {
     String email,
     String password,
   ) async {
-    final data = await ApiService.post('auth.php', {
+    // Beaucoup de backends PHP attendent application/x-www-form-urlencoded
+    final data = await ApiService.postForm('auth.php', {
       'action': 'login',
       'email': email,
       'password': password,

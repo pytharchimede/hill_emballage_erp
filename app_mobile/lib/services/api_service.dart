@@ -1,11 +1,13 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'http_client_stub.dart' if (dart.library.html) 'http_client_web.dart';
 
 class ApiService {
   static const String baseUrl = 'http://localhost/hill/api';
   static Map<String, String> _defaultHeaders = {
     'Content-Type': 'application/json',
   };
+  static final http.Client _client = createHttpClient();
 
   static void setAuthToken(String token) {
     _defaultHeaders['Authorization'] = 'Bearer $token';
@@ -21,7 +23,7 @@ class ApiService {
   // Méthode générique pour les requêtes GET
   static Future<Map<String, dynamic>> get(String endpoint) async {
     try {
-      final response = await http.get(
+      final response = await _client.get(
         Uri.parse('$baseUrl/$endpoint'),
         headers: headers,
       );
@@ -38,10 +40,31 @@ class ApiService {
     Map<String, dynamic> data,
   ) async {
     try {
-      final response = await http.post(
+      final response = await _client.post(
         Uri.parse('$baseUrl/$endpoint'),
         headers: headers,
         body: jsonEncode(data),
+      );
+
+      return _handleResponse(response);
+    } catch (e) {
+      throw Exception('Erreur réseau: $e');
+    }
+  }
+
+  // Méthode POST (form-urlencoded) pour compatibilité PHP ($_POST)
+  static Future<Map<String, dynamic>> postForm(
+    String endpoint,
+    Map<String, String> data,
+  ) async {
+    try {
+      final formHeaders = Map<String, String>.from(_defaultHeaders);
+      formHeaders['Content-Type'] = 'application/x-www-form-urlencoded';
+
+      final response = await _client.post(
+        Uri.parse('$baseUrl/$endpoint'),
+        headers: formHeaders,
+        body: Uri(queryParameters: data).query, // clé=valeur&...
       );
 
       return _handleResponse(response);
@@ -56,7 +79,7 @@ class ApiService {
     Map<String, dynamic> data,
   ) async {
     try {
-      final response = await http.put(
+      final response = await _client.put(
         Uri.parse('$baseUrl/$endpoint'),
         headers: headers,
         body: jsonEncode(data),
@@ -71,7 +94,7 @@ class ApiService {
   // Méthode générique pour les requêtes DELETE
   static Future<Map<String, dynamic>> delete(String endpoint) async {
     try {
-      final response = await http.delete(
+      final response = await _client.delete(
         Uri.parse('$baseUrl/$endpoint'),
         headers: headers,
       );
@@ -97,7 +120,7 @@ class ApiService {
   // Vérification de la connectivité
   static Future<bool> checkConnection() async {
     try {
-      final response = await http.get(
+      final response = await _client.get(
         Uri.parse('$baseUrl/auth.php'),
         headers: {'Content-Type': 'application/json'},
       ).timeout(const Duration(seconds: 5));
