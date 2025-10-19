@@ -39,6 +39,15 @@
             align-items: center;
         }
 
+        .navbar .menu-toggle {
+            background: transparent;
+            border: 0;
+            color: #333;
+            font-size: 1.5rem;
+            display: none;
+            /* visible en mobile via media query */
+        }
+
         .navbar .logo {
             font-size: 1.5rem;
             font-weight: bold;
@@ -304,6 +313,49 @@
             color: #2ed573;
         }
 
+        .menu-backdrop {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.4);
+            z-index: 1040;
+        }
+
+        @media (max-width: 992px) {
+            .navbar .menu-toggle {
+                display: inline-flex;
+            }
+
+            .app-container {
+                position: relative;
+            }
+
+            .sidebar {
+                position: fixed;
+                top: 64px;
+                /* approx hauteur navbar */
+                left: 0;
+                height: calc(100vh - 64px);
+                transform: translateX(-100%);
+                transition: transform .25s ease;
+                z-index: 1050;
+                /* sous les modals (1070) */
+                padding-top: 1rem;
+            }
+
+            body.menu-open .sidebar {
+                transform: translateX(0%);
+            }
+
+            body.menu-open .menu-backdrop {
+                display: block;
+            }
+
+            .main-content {
+                padding: 1rem;
+            }
+        }
+
         @media (max-width: 768px) {
             .app-container {
                 flex-direction: column;
@@ -374,9 +426,13 @@
     </style>
 
     <script src="<?= ASSETS_URL ?>/js/fallback.js"></script>
+    <script src="<?= ASSETS_URL ?>/js/menu.js"></script>
 
     <?php if (isLoggedIn()): ?>
         <nav class="navbar">
+            <button class="menu-toggle" aria-label="Ouvrir le menu" aria-controls="sidebar" aria-expanded="false">
+                <i class="fas fa-bars"></i>
+            </button>
             <div class="logo">
                 <i class="fas fa-boxes"></i> <?= APP_NAME ?>
             </div>
@@ -392,7 +448,7 @@
         </nav>
 
         <div class="app-container">
-            <aside class="sidebar">
+            <aside class="sidebar" id="sidebar" aria-label="Menu principal">
                 <?php
                 $currentPath = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH);
                 $currentPage = basename($currentPath ?: ($_SERVER['PHP_SELF'] ?? ''));
@@ -408,6 +464,7 @@
                     </a>
                 <?php endforeach; ?>
             </aside>
+            <div class="menu-backdrop" data-menu-backdrop></div>
 
             <main class="main-content">
                 <?php

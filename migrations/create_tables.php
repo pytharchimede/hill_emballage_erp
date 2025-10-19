@@ -254,10 +254,10 @@ try {
     // Insérer l'utilisateur admin
     $hashedPassword = password_hash('admin123', PASSWORD_DEFAULT);
     $sql = "INSERT INTO users (username, email, password, full_name, role, depot_id) VALUES 
-            ('admin', 'admin@hillemballage.ci', ?, 'Administrateur Hill', 'admin', 1)";
+            ('admin', 'admin@hill.com', ?, 'Administrateur Hill', 'admin', 1)";
     $stmt = $conn->prepare($sql);
     $stmt->execute([$hashedPassword]);
-    echo "<p class='success'>✓ Utilisateur admin créé (admin@hillemballage.ci / admin123)</p>\n";
+    echo "<p class='success'>✓ Utilisateur admin créé (admin@hill.com / admin123)</p>\n";
 
     // Insérer des produits
     $sql = "INSERT INTO produits (nom, code_produit, description, unite, prix_unitaire, prix_credit, points_fidelite) VALUES 
@@ -298,7 +298,7 @@ try {
     echo "</ul>\n";
     echo "<p><strong>Identifiants de test :</strong></p>\n";
     echo "<ul>\n";
-    echo "<li>Email: admin@hillemballage.ci</li>\n";
+    echo "<li>Email: admin@hill.com</li>\n";
     echo "<li>Mot de passe: admin123</li>\n";
     echo "</ul>\n";
 } catch (Exception $e) {

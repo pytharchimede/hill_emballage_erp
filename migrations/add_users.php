@@ -19,11 +19,11 @@ try {
 
     // Ajouter des utilisateurs pour chaque rôle
     $users = [
-        ['vendeur1', 'vendeur@hillemballage.ci', 'vendeur123', 'Jean Vendeur', 'vendeur'],
-        ['livreur1', 'livreur@hillemballage.ci', 'livreur123', 'Pierre Livreur', 'livreur'],
-        ['comptable1', 'comptable@hillemballage.ci', 'comptable123', 'Marie Comptable', 'comptable'],
-        ['vendeur2', 'vendeur2@hillemballage.ci', 'vendeur123', 'Fatou Vendeuse', 'vendeur'],
-        ['livreur2', 'livreur2@hillemballage.ci', 'livreur123', 'Mamadou Livreur', 'livreur']
+        ['vendeur1', 'vendeur@hill.com', 'vendeur123', 'Jean Vendeur', 'vendeur'],
+        ['livreur1', 'livreur@hill.com', 'livreur123', 'Pierre Livreur', 'livreur'],
+        ['comptable1', 'comptable@hill.com', 'comptable123', 'Marie Comptable', 'comptable'],
+        ['vendeur2', 'vendeur2@hill.com', 'vendeur123', 'Fatou Vendeuse', 'vendeur'],
+        ['livreur2', 'livreur2@hill.com', 'livreur123', 'Mamadou Livreur', 'livreur']
     ];
 
     foreach ($users as $user) {
@@ -47,10 +47,10 @@ try {
     echo "<hr><h3 class='success'>Comptes créés avec succès !</h3>\n";
     echo "<table border='1' style='border-collapse:collapse; width:100%;'>\n";
     echo "<tr style='background:#FFD700;'><th style='padding:10px;'>Rôle</th><th style='padding:10px;'>Email</th><th style='padding:10px;'>Mot de passe</th><th style='padding:10px;'>Actions</th></tr>\n";
-    echo "<tr><td style='padding:8px;'>Admin</td><td style='padding:8px;'>admin@hillemballage.ci</td><td style='padding:8px;'>admin123</td><td style='padding:8px;'>Gestion complète</td></tr>\n";
-    echo "<tr><td style='padding:8px;'>Vendeur</td><td style='padding:8px;'>vendeur@hillemballage.ci</td><td style='padding:8px;'>vendeur123</td><td style='padding:8px;'>Ventes, Clients</td></tr>\n";
-    echo "<tr><td style='padding:8px;'>Livreur</td><td style='padding:8px;'>livreur@hillemballage.ci</td><td style='padding:8px;'>livreur123</td><td style='padding:8px;'>Livraisons, Stock</td></tr>\n";
-    echo "<tr><td style='padding:8px;'>Comptable</td><td style='padding:8px;'>comptable@hillemballage.ci</td><td style='padding:8px;'>comptable123</td><td style='padding:8px;'>Paiements, Rapports</td></tr>\n";
+    echo "<tr><td style='padding:8px;'>Admin</td><td style='padding:8px;'>admin@hill.com</td><td style='padding:8px;'>admin123</td><td style='padding:8px;'>Gestion complète</td></tr>\n";
+    echo "<tr><td style='padding:8px;'>Vendeur</td><td style='padding:8px;'>vendeur@hill.com</td><td style='padding:8px;'>vendeur123</td><td style='padding:8px;'>Ventes, Clients</td></tr>\n";
+    echo "<tr><td style='padding:8px;'>Livreur</td><td style='padding:8px;'>livreur@hill.com</td><td style='padding:8px;'>livreur123</td><td style='padding:8px;'>Livraisons, Stock</td></tr>\n";
+    echo "<tr><td style='padding:8px;'>Comptable</td><td style='padding:8px;'>comptable@hill.com</td><td style='padding:8px;'>comptable123</td><td style='padding:8px;'>Paiements, Rapports</td></tr>\n";
     echo "</table>\n";
 } catch (Exception $e) {
     echo "<p class='error'>Erreur : " . $e->getMessage() . "</p>\n";

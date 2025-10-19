@@ -137,9 +137,9 @@ $pageTitle = 'Connexion - ' . APP_NAME;
             <div class="demo-account">
                 <div>
                     <span class="role">Administrateur</span><br>
-                    <span class="credentials">admin@hillemballage.ci / admin123</span>
+                    <span class="credentials">admin@hill.com / admin123</span>
                 </div>
-                <button class="quick-login" data-email="admin@hillemballage.ci" data-password="admin123">
+                <button class="quick-login" data-email="admin@hill.com" data-password="admin123">
                     Connexion rapide
                 </button>
             </div>
@@ -147,9 +147,9 @@ $pageTitle = 'Connexion - ' . APP_NAME;
             <div class="demo-account">
                 <div>
                     <span class="role">Vendeur</span><br>
-                    <span class="credentials">vendeur@hillemballage.ci / vendeur123</span>
+                    <span class="credentials">vendeur@hill.com / vendeur123</span>
                 </div>
-                <button class="quick-login" data-email="vendeur@hillemballage.ci" data-password="vendeur123">
+                <button class="quick-login" data-email="vendeur@hill.com" data-password="vendeur123">
                     Connexion rapide
                 </button>
             </div>
@@ -157,9 +157,9 @@ $pageTitle = 'Connexion - ' . APP_NAME;
             <div class="demo-account">
                 <div>
                     <span class="role">Livreur</span><br>
-                    <span class="credentials">livreur@hillemballage.ci / livreur123</span>
+                    <span class="credentials">livreur@hill.com / livreur123</span>
                 </div>
-                <button class="quick-login" data-email="livreur@hillemballage.ci" data-password="livreur123">
+                <button class="quick-login" data-email="livreur@hill.com" data-password="livreur123">
                     Connexion rapide
                 </button>
             </div>
@@ -167,9 +167,9 @@ $pageTitle = 'Connexion - ' . APP_NAME;
             <div class="demo-account">
                 <div>
                     <span class="role">Comptable</span><br>
-                    <span class="credentials">comptable@hillemballage.ci / comptable123</span>
+                    <span class="credentials">comptable@hill.com / comptable123</span>
                 </div>
-                <button class="quick-login" data-email="comptable@hillemballage.ci" data-password="comptable123">
+                <button class="quick-login" data-email="comptable@hill.com" data-password="comptable123">
                     Connexion rapide
                 </button>
             </div>

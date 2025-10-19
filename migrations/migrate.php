@@ -254,18 +254,18 @@ try {
     // Insérer l'utilisateur admin avec mot de passe hashé
     $hashedPassword = password_hash('admin123', PASSWORD_DEFAULT);
     $sql = "INSERT INTO users (username, email, password, full_name, role, depot_id) VALUES 
-            ('admin', 'admin@hillemballage.ci', ?, 'Administrateur Hill', 'admin', 1)";
+            ('admin', 'admin@hill.com', ?, 'Administrateur Hill', 'admin', 1)";
     $stmt = $conn->prepare($sql);
     $stmt->execute([$hashedPassword]);
-    echo "<p class='success'>✓ Utilisateur admin créé (admin@hillemballage.ci / admin123)</p>\n";
+    echo "<p class='success'>✓ Utilisateur admin créé (admin@hill.com / admin123)</p>\n";
 
     // Insérer des utilisateurs supplémentaires
     $vendeurPassword = password_hash('vendeur123', PASSWORD_DEFAULT);
     $sql = "INSERT INTO users (username, email, password, full_name, role, depot_id) VALUES 
-            ('vendeur1', 'vendeur@hillemballage.ci', ?, 'Jean Vendeur', 'vendeur', 1)";
+            ('vendeur1', 'vendeur@hill.com', ?, 'Jean Vendeur', 'vendeur', 1)";
     $stmt = $conn->prepare($sql);
     $stmt->execute([$vendeurPassword]);
-    echo "<p class='success'>✓ Utilisateur vendeur créé (vendeur@hillemballage.ci / vendeur123)</p>\n";
+    echo "<p class='success'>✓ Utilisateur vendeur créé (vendeur@hill.com / vendeur123)</p>\n";
 
     // Insérer des produits
     $sql = "INSERT INTO produits (nom, code_produit, description, unite, prix_unitaire, prix_credit, points_fidelite) VALUES 
@@ -307,14 +307,14 @@ try {
     echo "<p><strong>Identifiants de test :</strong></p>\n";
     echo "<table border='1' style='border-collapse:collapse; padding:10px;'>\n";
     echo "<tr><th style='padding:8px; background:#FFD700;'>Rôle</th><th style='padding:8px; background:#FFD700;'>Email</th><th style='padding:8px; background:#FFD700;'>Mot de passe</th></tr>\n";
-    echo "<tr><td style='padding:8px;'>Admin</td><td style='padding:8px;'>admin@hillemballage.ci</td><td style='padding:8px;'>admin123</td></tr>\n";
-    echo "<tr><td style='padding:8px;'>Vendeur</td><td style='padding:8px;'>vendeur@hillemballage.ci</td><td style='padding:8px;'>vendeur123</td></tr>\n";
+    echo "<tr><td style='padding:8px;'>Admin</td><td style='padding:8px;'>admin@hill.com</td><td style='padding:8px;'>admin123</td></tr>\n";
+    echo "<tr><td style='padding:8px;'>Vendeur</td><td style='padding:8px;'>vendeur@hill.com</td><td style='padding:8px;'>vendeur123</td></tr>\n";
     echo "</table>\n";
 
     echo "<p><strong>Test rapide de l'authentification :</strong></p>\n";
     echo "<form method='post' action='../backend/requests/auth.php' style='background:#f5f5f5; padding:20px; border-radius:5px;'>\n";
     echo "<input type='hidden' name='action' value='login'>\n";
-    echo "<input type='text' name='username' value='admin@hillemballage.ci' placeholder='Email' style='margin:5px; padding:8px;'><br>\n";
+    echo "<input type='text' name='username' value='admin@hill.com' placeholder='Email' style='margin:5px; padding:8px;'><br>\n";
     echo "<input type='password' name='password' value='admin123' placeholder='Mot de passe' style='margin:5px; padding:8px;'><br>\n";
     echo "<button type='submit' style='background:#FFD700; color:black; padding:10px 20px; border:none; border-radius:5px; margin:5px;'>Tester la connexion</button>\n";
     echo "</form>\n";

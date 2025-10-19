@@ -50,27 +50,6 @@ class ApiService {
     }
   }
 
-  // Méthode POST (form-urlencoded) pour compatibilité PHP ($_POST)
-  static Future<Map<String, dynamic>> postForm(
-    String endpoint,
-    Map<String, String> data,
-  ) async {
-    try {
-      final formHeaders = Map<String, String>.from(_defaultHeaders);
-      formHeaders['Content-Type'] = 'application/x-www-form-urlencoded';
-
-      final response = await http.post(
-        Uri.parse('$baseUrl/$endpoint'),
-        headers: formHeaders,
-        body: Uri(queryParameters: data).query, // clé=valeur&...
-      );
-
-      return _handleResponse(response);
-    } catch (e) {
-      throw Exception('Erreur réseau: $e');
-    }
-  }
-
   // Méthode générique pour les requêtes PUT
   static Future<Map<String, dynamic>> put(
     String endpoint,
