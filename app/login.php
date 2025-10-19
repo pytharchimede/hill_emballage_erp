@@ -87,176 +87,7 @@ $pageTitle = 'Connexion - ' . APP_NAME;
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= $pageTitle ?></title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #FFD700 0%, #FFA500 50%, #FF8C00 100%);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .login-container {
-            background: white;
-            padding: 3rem;
-            border-radius: 20px;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
-            width: 100%;
-            max-width: 450px;
-            text-align: center;
-        }
-
-        .logo {
-            font-size: 3rem;
-            color: #FFD700;
-            margin-bottom: 1rem;
-        }
-
-        .app-title {
-            font-size: 2rem;
-            font-weight: bold;
-            color: #333;
-            margin-bottom: 0.5rem;
-            letter-spacing: 1px;
-        }
-
-        .app-subtitle {
-            color: #666;
-            margin-bottom: 2rem;
-            font-size: 1.1rem;
-        }
-
-        .form-group {
-            margin-bottom: 1.5rem;
-            text-align: left;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 0.5rem;
-            font-weight: 500;
-            color: #333;
-        }
-
-        .form-group input {
-            width: 100%;
-            padding: 1rem;
-            border: 2px solid #ddd;
-            border-radius: 10px;
-            font-size: 1rem;
-            transition: border-color 0.3s ease;
-        }
-
-        .form-group input:focus {
-            outline: none;
-            border-color: #FFD700;
-            box-shadow: 0 0 0 3px rgba(255, 215, 0, 0.1);
-        }
-
-        .form-group .input-icon {
-            position: relative;
-        }
-
-        .form-group .input-icon i {
-            position: absolute;
-            left: 1rem;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #999;
-        }
-
-        .form-group .input-icon input {
-            padding-left: 3rem;
-        }
-
-        .btn-login {
-            width: 100%;
-            padding: 1rem;
-            background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
-            color: #333;
-            border: none;
-            border-radius: 10px;
-            font-size: 1.1rem;
-            font-weight: bold;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            margin-bottom: 2rem;
-        }
-
-        .btn-login:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(255, 215, 0, 0.4);
-        }
-
-        .error-message {
-            background: #f8d7da;
-            color: #721c24;
-            padding: 1rem;
-            border-radius: 10px;
-            margin-bottom: 1.5rem;
-            border: 1px solid #f5c6cb;
-        }
-
-        .demo-accounts {
-            background: #f8f9fa;
-            padding: 1.5rem;
-            border-radius: 10px;
-            margin-top: 2rem;
-            text-align: left;
-        }
-
-        .demo-accounts h4 {
-            color: #333;
-            margin-bottom: 1rem;
-            text-align: center;
-        }
-
-        .demo-account {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0.5rem 0;
-            border-bottom: 1px solid #ddd;
-        }
-
-        .demo-account:last-child {
-            border-bottom: none;
-        }
-
-        .demo-account .role {
-            font-weight: bold;
-            color: #FFD700;
-        }
-
-        .demo-account .credentials {
-            font-size: 0.9rem;
-            color: #666;
-        }
-
-        .quick-login {
-            background: none;
-            border: none;
-            color: #007bff;
-            cursor: pointer;
-            text-decoration: underline;
-            font-size: 0.8rem;
-        }
-
-        .footer-info {
-            margin-top: 2rem;
-            padding-top: 1rem;
-            border-top: 1px solid #eee;
-            color: #999;
-            font-size: 0.9rem;
-        }
-    </style>
+    <link rel="stylesheet" href="<?= ASSETS_URL ?>/css/login.css">
 </head>
 
 <body>
@@ -306,9 +137,9 @@ $pageTitle = 'Connexion - ' . APP_NAME;
             <div class="demo-account">
                 <div>
                     <span class="role">Administrateur</span><br>
-                    <span class="credentials">admin@hill.com / admin123</span>
+                    <span class="credentials">admin@hillemballage.ci / admin123</span>
                 </div>
-                <button class="quick-login" data-email="admin@hill.com" data-password="admin123">
+                <button class="quick-login" data-email="admin@hillemballage.ci" data-password="admin123">
                     Connexion rapide
                 </button>
             </div>
@@ -316,9 +147,9 @@ $pageTitle = 'Connexion - ' . APP_NAME;
             <div class="demo-account">
                 <div>
                     <span class="role">Vendeur</span><br>
-                    <span class="credentials">vendeur@hill.com / vendeur123</span>
+                    <span class="credentials">vendeur@hillemballage.ci / vendeur123</span>
                 </div>
-                <button class="quick-login" data-email="vendeur@hill.com" data-password="vendeur123">
+                <button class="quick-login" data-email="vendeur@hillemballage.ci" data-password="vendeur123">
                     Connexion rapide
                 </button>
             </div>
@@ -326,9 +157,9 @@ $pageTitle = 'Connexion - ' . APP_NAME;
             <div class="demo-account">
                 <div>
                     <span class="role">Livreur</span><br>
-                    <span class="credentials">livreur@hill.com / livreur123</span>
+                    <span class="credentials">livreur@hillemballage.ci / livreur123</span>
                 </div>
-                <button class="quick-login" data-email="livreur@hill.com" data-password="livreur123">
+                <button class="quick-login" data-email="livreur@hillemballage.ci" data-password="livreur123">
                     Connexion rapide
                 </button>
             </div>
@@ -336,9 +167,9 @@ $pageTitle = 'Connexion - ' . APP_NAME;
             <div class="demo-account">
                 <div>
                     <span class="role">Comptable</span><br>
-                    <span class="credentials">comptable@hill.com / comptable123</span>
+                    <span class="credentials">comptable@hillemballage.ci / comptable123</span>
                 </div>
-                <button class="quick-login" data-email="comptable@hill.com" data-password="comptable123">
+                <button class="quick-login" data-email="comptable@hillemballage.ci" data-password="comptable123">
                     Connexion rapide
                 </button>
             </div>

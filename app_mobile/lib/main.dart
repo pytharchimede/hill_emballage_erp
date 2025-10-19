@@ -74,27 +74,36 @@ class MyApp extends StatelessWidget {
           useMaterial3: true,
         ),
         home: Consumer<AuthProvider>(
-          builder: (context, authProvider, child) {
-            // Vérifier l'état d'authentification au démarrage
-            if (!authProvider.isLoading) {
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                authProvider.checkAuthStatus();
-              });
-            }
-
-            if (authProvider.isLoading) {
+          builder: (context, auth, _) {
+            // Splash pendant l'initialisation unique
+            if (!auth.isInitialized || auth.isLoading) {
               return const Scaffold(
                 body: Center(
-                  child: CircularProgressIndicator(
-                    color: Color(0xFFFFD700),
-                  ),
+                  child: CircularProgressIndicator(color: Color(0xFFFFD700)),
                 ),
               );
             }
 
-            return authProvider.isAuthenticated
-                ? const DashboardScreen()
-                : const LoginScreen();
+            // Transition fluide entre Login et Dashboard
+            final Widget child = auth.isAuthenticated
+                ? const DashboardScreen(key: ValueKey('dashboard'))
+                : const LoginScreen(key: ValueKey('login'));
+
+            return AnimatedSwitcher(
+              duration: const Duration(milliseconds: 250),
+              switchInCurve: Curves.easeOut,
+              switchOutCurve: Curves.easeIn,
+              layoutBuilder: (currentChild, previousChildren) {
+                return Stack(
+                  alignment: Alignment.center,
+                  children: <Widget>[
+                    ...previousChildren,
+                    if (currentChild != null) currentChild,
+                  ],
+                );
+              },
+              child: child,
+            );
           },
         ),
         debugShowCheckedModeBanner: false,

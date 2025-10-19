@@ -50,6 +50,27 @@ class ApiService {
     }
   }
 
+  // Méthode POST (form-urlencoded) pour compatibilité PHP ($_POST)
+  static Future<Map<String, dynamic>> postForm(
+    String endpoint,
+    Map<String, String> data,
+  ) async {
+    try {
+      final formHeaders = Map<String, String>.from(_defaultHeaders);
+      formHeaders['Content-Type'] = 'application/x-www-form-urlencoded';
+
+      final response = await http.post(
+        Uri.parse('$baseUrl/$endpoint'),
+        headers: formHeaders,
+        body: Uri(queryParameters: data).query, // clé=valeur&...
+      );
+
+      return _handleResponse(response);
+    } catch (e) {
+      throw Exception('Erreur réseau: $e');
+    }
+  }
+
   // Méthode générique pour les requêtes PUT
   static Future<Map<String, dynamic>> put(
     String endpoint,
@@ -97,12 +118,10 @@ class ApiService {
   // Vérification de la connectivité
   static Future<bool> checkConnection() async {
     try {
-      final response = await http
-          .get(
-            Uri.parse('$baseUrl/auth.php'),
-            headers: {'Content-Type': 'application/json'},
-          )
-          .timeout(const Duration(seconds: 5));
+      final response = await http.get(
+        Uri.parse('$baseUrl/auth.php'),
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(const Duration(seconds: 5));
 
       return response.statusCode == 200 || response.statusCode == 401;
     } catch (e) {

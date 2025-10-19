@@ -241,7 +241,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'Email: admin@hill.com\nMot de passe: admin123',
+                          'Email: admin@hillemballage.ci\nMot de passe: admin123',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 12,
