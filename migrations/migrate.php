@@ -230,6 +230,18 @@ try {
     $conn->exec($sql);
     echo "<p class='success'>✓ Table fidelity_points créée</p>\n";
 
+    // Table user_permissions (overrides de droits)
+    $sql = "CREATE TABLE user_permissions (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        permission VARCHAR(100) NOT NULL,
+        allowed TINYINT(1) NOT NULL DEFAULT 1,
+        UNIQUE KEY uniq_user_perm (user_id, permission),
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )";
+    $conn->exec($sql);
+    echo "<p class='success'>✓ Table user_permissions créée</p>\n";
+
     echo "<hr><h3>Insertion des données de test</h3>\n";
 
     // Insérer les dépôts

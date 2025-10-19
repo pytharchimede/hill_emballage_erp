@@ -340,11 +340,11 @@
         body.no-bs-css .modal {
             display: none;
             position: fixed;
-            z-index: 1055;
+            z-index: 1070;
+            /* au-dessus du backdrop fallback (1060) */
             inset: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0, 0, 0, 0.5);
         }
 
         body.no-bs-css .modal.show {
@@ -354,13 +354,14 @@
         body.no-bs-css .modal .modal-dialog {
             position: relative;
             margin: 1.75rem auto;
-            max-width: 900px;
+            max-width: 1000px;
         }
 
         body.no-bs-css .modal .modal-content {
             background: #fff;
-            border-radius: 0.5rem;
+            border-radius: 0.75rem;
             overflow: hidden;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.18);
         }
 
         body.no-bs-css .btn-close {
@@ -372,61 +373,7 @@
         }
     </style>
 
-    <script>
-        (function() {
-            // Détecter si Bootstrap CSS est appliqué (z-index attendu >= 1055 sur .modal)
-            var probe = document.createElement('div');
-            probe.className = 'modal';
-            probe.style.position = 'absolute';
-            probe.style.visibility = 'hidden';
-            document.body.appendChild(probe);
-            var z = parseInt(window.getComputedStyle(probe).zIndex || '0', 10);
-            document.body.removeChild(probe);
-            var hasBootstrapCss = z >= 1055;
-            if (!hasBootstrapCss) {
-                document.body.classList.add('no-bs-css');
-            }
-
-            // Fallback JS si Bootstrap JS indisponible: bascule simple d'affichage des modals
-            if (!(window.bootstrap && window.bootstrap.Modal)) {
-                function showModal(id) {
-                    var el = document.getElementById(id);
-                    if (!el) return;
-                    document.body.classList.add('no-bs-css');
-                    el.classList.add('show');
-                    el.style.display = 'block';
-                    el.setAttribute('aria-modal', 'true');
-                    el.removeAttribute('aria-hidden');
-                }
-
-                function hideModal(el) {
-                    el.classList.remove('show');
-                    el.style.display = 'none';
-                    el.removeAttribute('aria-modal');
-                    el.setAttribute('aria-hidden', 'true');
-                }
-                window.__fallbackShowModal = showModal;
-                document.addEventListener('click', function(e) {
-                    var btn = e.target.closest('[data-bs-toggle="modal"]');
-                    if (btn) {
-                        var target = btn.getAttribute('data-bs-target');
-                        if (target && target.startsWith('#')) {
-                            e.preventDefault();
-                            showModal(target.substring(1));
-                        }
-                    }
-                    var closeBtn = e.target.closest('[data-bs-dismiss="modal"], .btn-close');
-                    if (closeBtn) {
-                        var modal = closeBtn.closest('.modal');
-                        if (modal) {
-                            e.preventDefault();
-                            hideModal(modal);
-                        }
-                    }
-                });
-            }
-        })();
-    </script>
+    <script src="<?= ASSETS_URL ?>/js/fallback.js"></script>
 
     <?php if (isLoggedIn()): ?>
         <nav class="navbar">
