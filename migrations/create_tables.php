@@ -30,6 +30,8 @@ try {
     echo "<p class='info'>Suppression des tables existantes...</p>\n";
     $conn->exec("SET FOREIGN_KEY_CHECKS=0");
     $dropTables = [
+        "DROP TABLE IF EXISTS attachments",
+        "DROP TABLE IF EXISTS audit_logs",
         "DROP TABLE IF EXISTS fidelity_points",
         "DROP TABLE IF EXISTS stock_transfers",
         "DROP TABLE IF EXISTS payments",
@@ -79,6 +81,7 @@ try {
         role ENUM('admin', 'vendeur', 'livreur', 'comptable') DEFAULT 'vendeur',
         phone VARCHAR(20),
         depot_id INT,
+        profile_photo VARCHAR(255) NULL,
         is_active BOOLEAN DEFAULT 1,
         last_login TIMESTAMP NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -119,6 +122,7 @@ try {
         prix_unitaire DECIMAL(10,2) NOT NULL,
         prix_credit DECIMAL(10,2),
         points_fidelite INT DEFAULT 1,
+        image_path VARCHAR(255) NULL,
         is_active BOOLEAN DEFAULT 1,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -195,6 +199,21 @@ try {
     $conn->exec($sql);
     echo "<p class='success'>✓ Table payments créée</p>\n";
 
+    // Table attachments (pièces jointes génériques)
+    $sql = "CREATE TABLE attachments (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        entity VARCHAR(50) NOT NULL,
+        entity_id INT NOT NULL,
+        path VARCHAR(255) NOT NULL,
+        mime VARCHAR(100) NULL,
+        uploaded_by INT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_entity (entity, entity_id),
+        FOREIGN KEY (uploaded_by) REFERENCES users(id) ON DELETE SET NULL
+    )";
+    $conn->exec($sql);
+    echo "<p class='success'>✓ Table attachments créée</p>\n";
+
     // Table stock_transfers
     $sql = "CREATE TABLE stock_transfers (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -241,6 +260,25 @@ try {
     )";
     $conn->exec($sql);
     echo "<p class='success'>✓ Table user_permissions créée</p>\n";
+
+    // Table audit_logs (traçabilité des actions)
+    $sql = "CREATE TABLE audit_logs (
+        id BIGINT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NULL,
+        action VARCHAR(50) NOT NULL,
+        entity VARCHAR(50) NULL,
+        entity_id INT NULL,
+        details TEXT NULL,
+        ip VARCHAR(45) NULL,
+        user_agent VARCHAR(255) NULL,
+        port INT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_action_created (action, created_at),
+        INDEX idx_entity_created (entity, created_at),
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+    )";
+    $conn->exec($sql);
+    echo "<p class='success'>✓ Table audit_logs créée</p>\n";
 
     echo "<hr><h3>Insertion des données de test</h3>\n";
 

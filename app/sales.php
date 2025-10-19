@@ -77,6 +77,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
             $db->commit();
+            log_action('CREATE', 'ventes', $vente_id, ['numero' => $numero, 'client_id' => $client_id, 'total' => $total]);
             $msg = 'Vente enregistrée';
             $msgType = 'success';
         }
@@ -85,6 +86,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $statut = $_POST['statut'] ?? 'en_attente';
             $st = $db->prepare("UPDATE ventes SET statut=?, updated_at=NOW() WHERE id=?");
             $st->execute([$statut, $id]);
+            log_action('UPDATE', 'ventes', $id, ['statut' => $statut]);
             $msg = 'Statut mis à jour';
             $msgType = 'success';
         }
@@ -95,6 +97,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $db->prepare("DELETE FROM vente_items WHERE vente_id=?")->execute([$id]);
             $db->prepare("DELETE FROM ventes WHERE id=?")->execute([$id]);
             $db->commit();
+            log_action('DELETE', 'ventes', $id);
             $msg = 'Vente supprimée';
             $msgType = 'success';
         }
@@ -158,6 +161,7 @@ $clients = $db->query("SELECT id, COALESCE(CONCAT(nom, ' ', IFNULL(prenom,'')), 
 $products = $db->query("SELECT id, nom, prix_unitaire, prix_credit FROM produits WHERE is_active=1 ORDER BY nom")->fetchAll(PDO::FETCH_ASSOC);
 
 $pageTitle = 'Ventes';
+log_action('VIEW', 'ventes');
 include 'includes/header.php';
 ?>
 <div class="page-header">
@@ -190,9 +194,15 @@ include 'includes/header.php';
         <div class="col-md-2"><input class="form-control" type="date" name="d1" value="<?= htmlspecialchars($d1) ?>" /></div>
         <div class="col-md-2"><input class="form-control" type="date" name="d2" value="<?= htmlspecialchars($d2) ?>" /></div>
         <div class="col-md-1"><button class="btn w-100">Filtrer</button></div>
+        <div class="col-md-2">
+            <a class="btn w-100" href="<?= BASE_URL ?>/app/export/sales_xls.php?search=<?= urlencode($search) ?>&statut=<?= urlencode($statut) ?>&type=<?= urlencode($type) ?>&d1=<?= urlencode($d1) ?>&d2=<?= urlencode($d2) ?>">Export XLS</a>
+        </div>
+        <div class="col-md-2">
+            <a class="btn w-100" href="<?= BASE_URL ?>/app/export/sales_pdf.php?search=<?= urlencode($search) ?>&statut=<?= urlencode($statut) ?>&type=<?= urlencode($type) ?>&d1=<?= urlencode($d1) ?>&d2=<?= urlencode($d2) ?>">Export PDF</a>
+        </div>
     </form>
 
-    <table class="table" style="margin-top:1rem;">
+    <table class="table" data-type="sales" style="margin-top:1rem;">
         <thead>
             <tr>
                 <th>N°</th>
@@ -236,6 +246,10 @@ include 'includes/header.php';
                                 <input type="hidden" name="id" value="<?= (int)$v['id'] ?>" />
                                 <button class="btn btn-danger" type="submit"><i class="fas fa-trash"></i></button>
                             </form>
+                        <?php endif; ?>
+                        <a class="btn" title="Facture PDF" href="<?= BASE_URL ?>/app/export/invoice_pdf.php?id=<?= (int)$v['id'] ?>"><i class="fas fa-file-pdf"></i></a>
+                        <?php if (hasPermission('sales_update')): ?>
+                            <button class="btn" title="Joindre" onclick="showAttach('ventes', <?= (int)$v['id'] ?>)"><i class="fas fa-paperclip"></i></button>
                         <?php endif; ?>
                     </td>
                 </tr>
@@ -380,3 +394,49 @@ include 'includes/header.php';
 <?php endif; ?>
 
 <?php include 'includes/footer.php'; ?>
+
+<div class="modal fade" id="attachModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-paperclip"></i> Joindre un document</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="<?= BASE_URL ?>/app/api/upload_attachment.php" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <input type="hidden" name="entity" id="att_entity" value="" />
+                    <input type="hidden" name="entity_id" id="att_entity_id" value="" />
+                    <input type="hidden" name="redirect" value="<?= BASE_URL ?>/web_admin/sales.php" />
+                    <div class="mb-3"><input class="form-control" type="file" name="file" required /></div>
+                    <div id="att_list" class="small"></div>
+                </div>
+                <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal" type="button">Fermer</button><button class="btn btn-primary" type="submit">Envoyer</button></div>
+            </form>
+        </div>
+    </div>
+</div>
+<script>
+    function showAttach(entity, id) {
+        document.getElementById('att_entity').value = entity;
+        document.getElementById('att_entity_id').value = id;
+        loadAttachments(entity, id);
+        const el = document.getElementById('attachModal');
+        if (window.bootstrap && window.bootstrap.Modal) new bootstrap.Modal(el).show();
+        else if (window.__fallbackShowModal) window.__fallbackShowModal('attachModal');
+    }
+    async function loadAttachments(entity, id) {
+        try {
+            const resp = await fetch('<?= BASE_URL ?>/app/export/attachments_list.php?entity=' + encodeURIComponent(entity) + '&id=' + id);
+            const html = await resp.text();
+            document.getElementById('att_list').innerHTML = html;
+        } catch (e) {
+            document.getElementById('att_list').innerHTML = '<em>Erreur de chargement.</em>';
+        }
+    }
+    async function deleteAttachment(attId) {
+        if (!confirm('Supprimer cette pièce ?')) return;
+        const resp = await fetch('<?= BASE_URL ?>/app/export/attachments_delete.php?id=' + attId, {
+            method: 'POST'
+        });
+        location.reload();
+    }
+</script>

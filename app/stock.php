@@ -107,6 +107,10 @@ include 'includes/header.php';
             </select>
         </div>
         <div class="col-md-2"><button class="btn w-100">Filtrer</button></div>
+        <div class="col-md-3">
+            <a class="btn" href="<?= BASE_URL ?>/app/export/stock_xls.php?td1=<?= urlencode($td1 ?? '') ?>&td2=<?= urlencode($td2 ?? '') ?>&tdepot=<?= (int)($tdepot ?? 0) ?>&tprod=<?= urlencode($tprod ?? '') ?>">Export XLS transferts</a>
+            <a class="btn" href="<?= BASE_URL ?>/app/export/stock_pdf.php?td1=<?= urlencode($td1 ?? '') ?>&td2=<?= urlencode($td2 ?? '') ?>&tdepot=<?= (int)($tdepot ?? 0) ?>&tprod=<?= urlencode($tprod ?? '') ?>">Export PDF</a>
+        </div>
     </form>
 
     <table class="table" style="margin-top:1rem;">

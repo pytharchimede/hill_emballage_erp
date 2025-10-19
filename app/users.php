@@ -170,6 +170,10 @@ include 'includes/header.php';
             </select>
         </div>
         <div class="col-md-2"><button class="btn w-100">Filtrer</button></div>
+        <div class="col-md-3">
+            <a class="btn" href="<?= BASE_URL ?>/app/export/users_xls.php">Export XLS</a>
+            <a class="btn" href="<?= BASE_URL ?>/app/export/users_pdf.php">Export PDF</a>
+        </div>
     </form>
 
     <table class="table" style="margin-top:1rem;">

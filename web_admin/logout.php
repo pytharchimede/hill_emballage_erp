@@ -1,5 +1,11 @@
 <?php
-session_start();
+require_once __DIR__ . '/../app/includes/config.php';
+// log before destroying session
+log_action('LOGOUT');
+// ensure session is started to destroy it
+if (session_status() !== PHP_SESSION_ACTIVE) {
+    session_start();
+}
 
 // Détruire toutes les variables de session
 $_SESSION = [];

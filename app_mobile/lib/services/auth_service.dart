@@ -24,7 +24,7 @@ class AuthService {
   // Déconnexion
   static Future<void> logout() async {
     try {
-      await ApiService.post('auth.php', {'action': 'logout'});
+      await ApiService.postForm('auth.php', {'action': 'logout'});
     } finally {
       ApiService.clearAuthToken();
     }
@@ -32,7 +32,7 @@ class AuthService {
 
   // Vérification du token
   static Future<Map<String, dynamic>> verifyToken() async {
-    return await ApiService.post('auth.php', {'action': 'verify'});
+    return await ApiService.postForm('auth.php', {'action': 'verify'});
   }
 
   // Récupération du profil utilisateur
@@ -67,7 +67,7 @@ class AuthService {
     required String currentPassword,
     required String newPassword,
   }) async {
-    return await ApiService.post('auth.php', {
+    return await ApiService.postForm('auth.php', {
       'action': 'change_password',
       'current_password': currentPassword,
       'new_password': newPassword,

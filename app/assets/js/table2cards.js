@@ -55,6 +55,24 @@
           actions.appendChild(btn.cloneNode(true));
         });
       }
+      // Optional image preview for products (first cell contains <img>)
+      var ttype = (table.getAttribute("data-type") || "").toLowerCase();
+      if (ttype === "products" || ttype === "produits") {
+        var imgCell = cells[0];
+        var img = imgCell && imgCell.querySelector("img");
+        if (img) {
+          var wrap = document.createElement("div");
+          wrap.className = "dc-thumb";
+          var thumb = img.cloneNode(true);
+          thumb.style.width = "100%";
+          thumb.style.height = "160px";
+          thumb.style.objectFit = "cover";
+          thumb.style.borderRadius = "8px";
+          wrap.appendChild(thumb);
+          card.appendChild(wrap);
+        }
+      }
+
       header.appendChild(title);
       header.appendChild(actions);
       card.appendChild(header);
@@ -74,6 +92,8 @@
             return i;
           });
       indices.forEach(function (idx) {
+        // For products, skip the image column already represented as thumb
+        if ((ttype === "products" || ttype === "produits") && idx === 0) return;
         var td = cells[idx];
         if (idx === cells.length - 1 && actions.childElementCount > 0) return; // actions already used
         var row = document.createElement("div");

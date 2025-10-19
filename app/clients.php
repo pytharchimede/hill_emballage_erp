@@ -243,6 +243,13 @@ include 'includes/header.php';
             <a href="clients.php" class="btn btn-outline">
                 <i class="fas fa-times"></i> Reset
             </a>
+
+            <a class="btn" href="<?= BASE_URL ?>/app/export/clients_xls.php?search=<?= urlencode($search) ?>">
+                <i class="fas fa-file-excel"></i> Export XLS
+            </a>
+            <a class="btn" href="<?= BASE_URL ?>/app/export/clients_pdf.php?search=<?= urlencode($search) ?>">
+                <i class="fas fa-file-pdf"></i> Export PDF
+            </a>
         </form>
     </div>
 

@@ -3,7 +3,8 @@ import 'package:http/http.dart' as http;
 import 'http_client_stub.dart' if (dart.library.html) 'http_client_web.dart';
 
 class ApiService {
-  static const String baseUrl = 'http://localhost/hill/api';
+  // URL fournie par l'utilisateur
+  static const String baseUrl = 'http://app.hillemballage.ci/backend/requests';
   static Map<String, String> _defaultHeaders = {
     'Content-Type': 'application/json',
   };
@@ -23,10 +24,12 @@ class ApiService {
   // Méthode générique pour les requêtes GET
   static Future<Map<String, dynamic>> get(String endpoint) async {
     try {
-      final response = await _client.get(
-        Uri.parse('$baseUrl/$endpoint'),
-        headers: headers,
-      );
+      final response = await _client
+          .get(
+            Uri.parse('$baseUrl/$endpoint'),
+            headers: headers,
+          )
+          .timeout(const Duration(seconds: 15));
 
       return _handleResponse(response);
     } catch (e) {
@@ -40,11 +43,13 @@ class ApiService {
     Map<String, dynamic> data,
   ) async {
     try {
-      final response = await _client.post(
-        Uri.parse('$baseUrl/$endpoint'),
-        headers: headers,
-        body: jsonEncode(data),
-      );
+      final response = await _client
+          .post(
+            Uri.parse('$baseUrl/$endpoint'),
+            headers: headers,
+            body: jsonEncode(data),
+          )
+          .timeout(const Duration(seconds: 15));
 
       return _handleResponse(response);
     } catch (e) {
@@ -61,11 +66,13 @@ class ApiService {
       final formHeaders = Map<String, String>.from(_defaultHeaders);
       formHeaders['Content-Type'] = 'application/x-www-form-urlencoded';
 
-      final response = await _client.post(
-        Uri.parse('$baseUrl/$endpoint'),
-        headers: formHeaders,
-        body: Uri(queryParameters: data).query, // clé=valeur&...
-      );
+      final response = await _client
+          .post(
+            Uri.parse('$baseUrl/$endpoint'),
+            headers: formHeaders,
+            body: Uri(queryParameters: data).query, // clé=valeur&...
+          )
+          .timeout(const Duration(seconds: 15));
 
       return _handleResponse(response);
     } catch (e) {
@@ -79,11 +86,13 @@ class ApiService {
     Map<String, dynamic> data,
   ) async {
     try {
-      final response = await _client.put(
-        Uri.parse('$baseUrl/$endpoint'),
-        headers: headers,
-        body: jsonEncode(data),
-      );
+      final response = await _client
+          .put(
+            Uri.parse('$baseUrl/$endpoint'),
+            headers: headers,
+            body: jsonEncode(data),
+          )
+          .timeout(const Duration(seconds: 15));
 
       return _handleResponse(response);
     } catch (e) {
@@ -94,10 +103,12 @@ class ApiService {
   // Méthode générique pour les requêtes DELETE
   static Future<Map<String, dynamic>> delete(String endpoint) async {
     try {
-      final response = await _client.delete(
-        Uri.parse('$baseUrl/$endpoint'),
-        headers: headers,
-      );
+      final response = await _client
+          .delete(
+            Uri.parse('$baseUrl/$endpoint'),
+            headers: headers,
+          )
+          .timeout(const Duration(seconds: 15));
 
       return _handleResponse(response);
     } catch (e) {
@@ -107,12 +118,27 @@ class ApiService {
 
   // Gestion des réponses HTTP
   static Map<String, dynamic> _handleResponse(http.Response response) {
-    final Map<String, dynamic> data = jsonDecode(response.body);
+    Map<String, dynamic> data;
+    try {
+      final decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        data = decoded;
+      } else {
+        data = {'success': false, 'message': 'Réponse invalide du serveur'};
+      }
+    } catch (_) {
+      data = {
+        'success': false,
+        'message': response.body.isNotEmpty
+            ? response.body
+            : 'Réponse non JSON du serveur',
+      };
+    }
 
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return data;
     } else {
-      String errorMessage = data['message'] ?? 'Erreur inconnue';
+      String errorMessage = data['message']?.toString() ?? 'Erreur inconnue';
       throw Exception('Erreur ${response.statusCode}: $errorMessage');
     }
   }

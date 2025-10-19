@@ -29,6 +29,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // update sale paid amount
             $db->prepare("UPDATE ventes SET montant_paye = montant_paye + ? WHERE id=?")->execute([$montant, $vente_id]);
             $db->prepare("UPDATE ventes SET statut = CASE WHEN montant_paye >= montant_total THEN 'validee' ELSE statut END WHERE id=?")->execute([$vente_id]);
+            log_action('CREATE', 'payments', (int)$db->lastInsertId(), ['vente_id' => $vente_id, 'montant' => $montant, 'mode' => $mode]);
             $msg = 'Paiement enregistré';
             $msgType = 'success';
         }
@@ -89,6 +90,7 @@ $pages = max(1, (int)ceil($total / $limit));
 $open = $db->query("SELECT id, numero_vente, (montant_total - montant_paye) as restant FROM ventes WHERE (montant_total - montant_paye) > 0 ORDER BY created_at DESC")->fetchAll(PDO::FETCH_ASSOC);
 
 $pageTitle = 'Paiements';
+log_action('VIEW', 'payments');
 include 'includes/header.php';
 ?>
 <div class="page-header">
@@ -121,9 +123,15 @@ include 'includes/header.php';
             </select>
         </div>
         <div class="col-md-1"><button class="btn w-100">Filtrer</button></div>
+        <div class="col-md-2">
+            <a class="btn w-100" href="<?= BASE_URL ?>/app/export/payments_xls.php?search=<?= urlencode($search) ?>&d1=<?= urlencode($d1) ?>&d2=<?= urlencode($d2) ?>&mode=<?= urlencode($mode) ?>&statut=<?= urlencode($statut) ?>">Export XLS</a>
+        </div>
+        <div class="col-md-2">
+            <a class="btn w-100" href="<?= BASE_URL ?>/app/export/payments_pdf.php?search=<?= urlencode($search) ?>&d1=<?= urlencode($d1) ?>&d2=<?= urlencode($d2) ?>&mode=<?= urlencode($mode) ?>&statut=<?= urlencode($statut) ?>">Export PDF</a>
+        </div>
     </form>
 
-    <table class="table" style="margin-top:1rem;">
+    <table class="table" data-type="payments" style="margin-top:1rem;">
         <thead>
             <tr>
                 <th>Reçu</th>
@@ -144,7 +152,13 @@ include 'includes/header.php';
                     <td><?= htmlspecialchars($p['client_nom']) ?></td>
                     <td><?= number_format($p['montant'], 0, ',', ' ') ?></td>
                     <td><?= htmlspecialchars($p['mode_payment']) ?></td>
-                    <td><?= htmlspecialchars($p['statut']) ?></td>
+                    <td>
+                        <?= htmlspecialchars($p['statut']) ?>
+                        <a class="btn" title="Reçu PDF" href="<?= BASE_URL ?>/app/export/receipt_pdf.php?id=<?= (int)$p['id'] ?>"><i class="fas fa-file-pdf"></i></a>
+                        <?php if (hasPermission('payments_update')): ?>
+                            <button class="btn" title="Joindre" onclick="showAttach('payments', <?= (int)$p['id'] ?>)"><i class="fas fa-paperclip"></i></button>
+                        <?php endif; ?>
+                    </td>
                 </tr>
             <?php endforeach; ?>
             <?php if (!$rows): ?><tr>
@@ -205,3 +219,49 @@ include 'includes/header.php';
 <?php endif; ?>
 
 <?php include 'includes/footer.php'; ?>
+
+<div class="modal fade" id="attachModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-paperclip"></i> Joindre un document</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="<?= BASE_URL ?>/app/api/upload_attachment.php" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <input type="hidden" name="entity" id="att_entity" value="" />
+                    <input type="hidden" name="entity_id" id="att_entity_id" value="" />
+                    <input type="hidden" name="redirect" value="<?= BASE_URL ?>/web_admin/payments.php" />
+                    <div class="mb-3"><input class="form-control" type="file" name="file" required /></div>
+                    <div id="att_list" class="small"></div>
+                </div>
+                <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal" type="button">Fermer</button><button class="btn btn-primary" type="submit">Envoyer</button></div>
+            </form>
+        </div>
+    </div>
+</div>
+<script>
+    function showAttach(entity, id) {
+        document.getElementById('att_entity').value = entity;
+        document.getElementById('att_entity_id').value = id;
+        loadAttachments(entity, id);
+        const el = document.getElementById('attachModal');
+        if (window.bootstrap && window.bootstrap.Modal) new bootstrap.Modal(el).show();
+        else if (window.__fallbackShowModal) window.__fallbackShowModal('attachModal');
+    }
+    async function loadAttachments(entity, id) {
+        try {
+            const resp = await fetch('<?= BASE_URL ?>/app/export/attachments_list.php?entity=' + encodeURIComponent(entity) + '&id=' + id);
+            const html = await resp.text();
+            document.getElementById('att_list').innerHTML = html;
+        } catch (e) {
+            document.getElementById('att_list').innerHTML = '<em>Erreur de chargement.</em>';
+        }
+    }
+    async function deleteAttachment(attId) {
+        if (!confirm('Supprimer cette pièce ?')) return;
+        await fetch('<?= BASE_URL ?>/app/export/attachments_delete.php?id=' + attId, {
+            method: 'POST'
+        });
+        location.reload();
+    }
+</script>

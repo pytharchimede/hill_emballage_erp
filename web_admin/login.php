@@ -66,6 +66,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $updateStmt = $db->prepare($updateSql);
                 $updateStmt->execute([$user['id']]);
 
+                // Log audit LOGIN
+                log_action('LOGIN', null, null, ['email' => $email, 'status' => 'success']);
+
                 // Redirection selon le rôle
                 $destinations = [
                     'admin' => 'dashboard.php',
@@ -78,6 +81,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 exit();
             } else {
                 $error = 'Email ou mot de passe incorrect.';
+                // Log audit échec LOGIN
+                log_action('LOGIN', null, null, ['email' => $email, 'status' => 'failed']);
             }
         } catch (Exception $e) {
             $error = 'Erreur de connexion. Veuillez réessayer.';

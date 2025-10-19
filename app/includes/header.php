@@ -441,7 +441,9 @@
                 <span class="user-role">
                     <i class="fas fa-user"></i> <?= ucfirst($_SESSION['user_role']) ?>
                 </span>
-                <span><?= $_SESSION['user_name'] ?></span>
+                <a href="<?= BASE_URL ?>/web_admin/profile.php" style="text-decoration:none;color:#333;">
+                    <span><?= $_SESSION['user_name'] ?></span>
+                </a>
                 <a href="<?= BASE_URL ?>/web_admin/logout.php" class="logout-btn">
                     <i class="fas fa-sign-out-alt"></i> Déconnexion
                 </a>

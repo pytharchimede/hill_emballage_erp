@@ -88,11 +88,71 @@ function formatDateTime($date)
     return date('d/m/Y H:i', strtotime($date));
 }
 
+// --- Traçabilité: utilitaires ---
+function clientIp()
+{
+    $ip = $_SERVER['HTTP_CLIENT_IP'] ?? $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? '';
+    // si X_FORWARDED_FOR contient plusieurs IP, prendre la première
+    if (strpos($ip, ',') !== false) {
+        $ip = trim(explode(',', $ip)[0]);
+    }
+    return $ip;
+}
+
+function clientPort()
+{
+    return isset($_SERVER['REMOTE_PORT']) ? (int)$_SERVER['REMOTE_PORT'] : null;
+}
+
+function clientUserAgent()
+{
+    return $_SERVER['HTTP_USER_AGENT'] ?? '';
+}
+
+/**
+ * Journaliser une action utilisateur.
+ * @param string $action ex: VIEW, CREATE, UPDATE, DELETE, VALIDATE, LOGIN, LOGOUT
+ * @param string|null $entity ex: produits, clients, ventes, payments
+ * @param int|null $entityId identifiant de l'entité
+ * @param array|string|null $details données additionnelles (stockées en texte)
+ */
+function log_action($action, $entity = null, $entityId = null, $details = null)
+{
+    global $db;
+    try {
+        // Vérifier si la table existe (au cas où migration pas encore faite)
+        $check = $db->prepare("SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'audit_logs'");
+        $check->execute();
+        if ((int)$check->fetchColumn() === 0) return; // silencieux
+
+        $userId = $_SESSION['user_id'] ?? null;
+        if (is_array($details)) {
+            // Sans JSON_FORCE_OBJECT ici; on veut conserver tableaux
+            $details = json_encode($details, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        }
+        $stmt = $db->prepare("INSERT INTO audit_logs (user_id, action, entity, entity_id, details, ip, user_agent, port, created_at)
+            VALUES (?,?,?,?,?,?,?,?, NOW())");
+        $stmt->execute([
+            $userId,
+            substr((string)$action, 0, 50),
+            $entity ? substr((string)$entity, 0, 50) : null,
+            $entityId !== null ? (int)$entityId : null,
+            $details,
+            substr(clientIp(), 0, 45),
+            substr(clientUserAgent(), 0, 255),
+            clientPort()
+        ]);
+    } catch (Exception $e) {
+        // ne pas interrompre le flux applicatif
+    }
+}
+
 function getMenuForRole($role)
 {
     $menus = [
         'admin' => [
             'dashboard' => ['icon' => 'fas fa-tachometer-alt', 'title' => 'Tableau de bord', 'url' => BASE_URL . '/web_admin/dashboard.php'],
+            'activity' => ['icon' => 'fas fa-history', 'title' => 'Activité', 'url' => BASE_URL . '/web_admin/activity.php'],
             'clients' => ['icon' => 'fas fa-users', 'title' => 'Clients', 'url' => BASE_URL . '/web_admin/clients.php'],
             'products' => ['icon' => 'fas fa-box', 'title' => 'Produits', 'url' => BASE_URL . '/web_admin/products.php'],
             'sales' => ['icon' => 'fas fa-shopping-cart', 'title' => 'Ventes', 'url' => BASE_URL . '/web_admin/sales.php'],
@@ -100,6 +160,7 @@ function getMenuForRole($role)
             'payments' => ['icon' => 'fas fa-credit-card', 'title' => 'Paiements', 'url' => BASE_URL . '/web_admin/payments.php'],
             'reports' => ['icon' => 'fas fa-chart-bar', 'title' => 'Rapports', 'url' => BASE_URL . '/web_admin/reports.php'],
             'users' => ['icon' => 'fas fa-user-cog', 'title' => 'Utilisateurs', 'url' => BASE_URL . '/web_admin/users.php'],
+            'profile' => ['icon' => 'fas fa-user-circle', 'title' => 'Mon profil', 'url' => BASE_URL . '/web_admin/profile.php'],
         ],
         'vendeur' => [
             'dashboard' => ['icon' => 'fas fa-tachometer-alt', 'title' => 'Tableau de bord', 'url' => BASE_URL . '/web_admin/vendeur.php'],
@@ -107,12 +168,16 @@ function getMenuForRole($role)
             'sales' => ['icon' => 'fas fa-shopping-cart', 'title' => 'Ventes', 'url' => BASE_URL . '/web_admin/sales.php'],
             'stock_view' => ['icon' => 'fas fa-eye', 'title' => 'Consulter Stock', 'url' => BASE_URL . '/web_admin/stock.php'],
             'my_sales' => ['icon' => 'fas fa-list', 'title' => 'Mes Ventes', 'url' => BASE_URL . '/web_admin/sales.php?mine=1'],
+            'my_activity' => ['icon' => 'fas fa-user-clock', 'title' => 'Mon activité', 'url' => BASE_URL . '/web_admin/my-activity.php'],
+            'profile' => ['icon' => 'fas fa-user-circle', 'title' => 'Mon profil', 'url' => BASE_URL . '/web_admin/profile.php'],
         ],
         'livreur' => [
             'dashboard' => ['icon' => 'fas fa-tachometer-alt', 'title' => 'Tableau de bord', 'url' => BASE_URL . '/web_admin/livreur.php'],
             'deliveries' => ['icon' => 'fas fa-truck', 'title' => 'Livraisons', 'url' => BASE_URL . '/web_admin/deliveries.php'],
             'stock' => ['icon' => 'fas fa-warehouse', 'title' => 'Stock', 'url' => BASE_URL . '/web_admin/stock.php'],
             'transfers' => ['icon' => 'fas fa-exchange-alt', 'title' => 'Transferts', 'url' => BASE_URL . '/web_admin/transfers.php'],
+            'my_activity' => ['icon' => 'fas fa-user-clock', 'title' => 'Mon activité', 'url' => BASE_URL . '/web_admin/my-activity.php'],
+            'profile' => ['icon' => 'fas fa-user-circle', 'title' => 'Mon profil', 'url' => BASE_URL . '/web_admin/profile.php'],
         ],
         'comptable' => [
             'dashboard' => ['icon' => 'fas fa-tachometer-alt', 'title' => 'Tableau de bord', 'url' => BASE_URL . '/web_admin/comptable.php'],
@@ -120,6 +185,8 @@ function getMenuForRole($role)
             'reports' => ['icon' => 'fas fa-chart-bar', 'title' => 'Rapports', 'url' => BASE_URL . '/web_admin/reports.php'],
             'credits' => ['icon' => 'fas fa-clock', 'title' => 'Crédits', 'url' => BASE_URL . '/web_admin/credits.php'],
             'clients_view' => ['icon' => 'fas fa-users', 'title' => 'Clients', 'url' => BASE_URL . '/web_admin/clients.php'],
+            'my_activity' => ['icon' => 'fas fa-user-clock', 'title' => 'Mon activité', 'url' => BASE_URL . '/web_admin/my-activity.php'],
+            'profile' => ['icon' => 'fas fa-user-circle', 'title' => 'Mon profil', 'url' => BASE_URL . '/web_admin/profile.php'],
         ]
     ];
 
