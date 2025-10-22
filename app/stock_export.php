@@ -32,7 +32,7 @@ if ($tprod !== '') {
 
 $stmt = $db->prepare("SELECT st.*, p.nom as produit_nom, ds.nom as depot_src, dd.nom as depot_dst, u.full_name as user_nom
                       FROM stock_transfers st
-                      JOIN produits p ON st.produit_id=p.id
+                      JOIN products p ON st.produit_id=p.id
                       JOIN depots ds ON st.depot_source=ds.id
                       JOIN depots dd ON st.depot_destination=dd.id
                       JOIN users u ON st.user_id=u.id

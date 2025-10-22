@@ -46,8 +46,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
+// Helper pour détecter la table produits canonique (préférer 'products')
+$colExists = function (PDO $db, $table, $col) {
+    try {
+        $s = $db->prepare("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?");
+        $s->execute([$table, $col]);
+        return (bool)$s->fetchColumn();
+    } catch (Exception $e) {
+        return false;
+    }
+};
+$prodTbl = $colExists($db, 'products', 'id') ? 'products' : ($colExists($db, 'produits', 'id') ? 'produits' : null);
+
 $depots = $db->query('SELECT id, nom FROM depots WHERE is_active=1 ORDER BY nom')->fetchAll(PDO::FETCH_ASSOC);
-$products = $db->query('SELECT id, nom FROM produits WHERE is_active=1 ORDER BY nom')->fetchAll(PDO::FETCH_ASSOC);
+$products = $prodTbl ? $db->query("SELECT id, nom FROM `$prodTbl` WHERE is_active=1 ORDER BY nom")->fetchAll(PDO::FETCH_ASSOC) : [];
 
 $pageTitle = 'Ajustements d\'inventaire';
 log_action('VIEW', 'stock_adjustments');

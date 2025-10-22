@@ -28,7 +28,7 @@ function colExists(PDO $db, $table, $column)
 }
 
 // Normaliser table/colonnes
-$tbl = colExists($db, 'products', 'id') ? 'products' : (colExists($db, 'produits', 'id') ? 'produits' : null);
+$tbl = colExists($db, 'products', 'id') ? 'products' : (colExists($db, 'products', 'id') ? 'products' : null);
 $hasImageCol = $tbl ? colExists($db, $tbl, 'image_path') : false;
 if (!$tbl) {
     include 'includes/header.php';
@@ -84,18 +84,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             } else {
                 if ($hasImageCol) {
-                    $sql = "INSERT INTO produits (nom, code_produit, description, unite, prix_unitaire, prix_credit, points_fidelite, image_path, is_active) VALUES (?,?,?,?,?,?,?,?,1)";
+                    $sql = "INSERT INTO products (nom, code_produit, description, unite, prix_unitaire, prix_credit, points_fidelite, image_path, is_active) VALUES (?,?,?,?,?,?,?,?,1)";
                     $st = $db->prepare($sql);
                     $st->execute([$name, $code, $desc, $unit, $price, $price_credit, $points, $imgPath]);
                 } else {
-                    $sql = "INSERT INTO produits (nom, code_produit, description, unite, prix_unitaire, prix_credit, points_fidelite, is_active) VALUES (?,?,?,?,?,?,?,1)";
+                    $sql = "INSERT INTO products (nom, code_produit, description, unite, prix_unitaire, prix_credit, points_fidelite, is_active) VALUES (?,?,?,?,?,?,?,1)";
                     $st = $db->prepare($sql);
                     $st->execute([$name, $code, $desc, $unit, $price, $price_credit, $points]);
                 }
             }
             // log action
             $newId = (int)$db->lastInsertId();
-            log_action('CREATE', 'produits', $newId, ['code' => $code, 'nom' => $name]);
+            log_action('CREATE', 'products', $newId, ['code' => $code, 'nom' => $name]);
             $message = 'Produit créé avec succès';
             $messageType = 'success';
         }
@@ -137,7 +137,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             $paramsUpd[] = $id;
             $st->execute($paramsUpd);
-            log_action('UPDATE', 'produits', $id, ['code' => $code, 'nom' => $name]);
+            log_action('UPDATE', 'products', $id, ['code' => $code, 'nom' => $name]);
             $message = 'Produit mis à jour';
             $messageType = 'success';
         }
@@ -152,7 +152,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $st = $db->prepare($sql);
                 $st->execute([$id]);
             }
-            log_action('DELETE', 'produits', $id);
+            log_action('DELETE', 'products', $id);
             $message = 'Produit supprimé';
             $messageType = 'success';
         }
@@ -190,7 +190,7 @@ $pages = max(1, (int)ceil($total / $limit));
 
 $pageTitle = 'Gestion des Produits';
 // Log view list
-log_action('VIEW', 'produits');
+log_action('VIEW', 'products');
 include 'includes/header.php';
 ?>
 <div class="page-header">

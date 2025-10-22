@@ -25,7 +25,7 @@ $kpiPayments = qv($db, "SELECT COALESCE(SUM(montant),0) val FROM payments WHERE 
 $kpiCredit = qv($db, "SELECT COALESCE(SUM(montant_total - montant_paye),0) val FROM ventes WHERE date_vente BETWEEN ? AND ? AND type_vente='credit'", [$d1, $d2])['val'];
 
 $topProducts = $db->prepare("SELECT p.nom, SUM(i.quantite) q, SUM(i.montant) m
-  FROM vente_items i JOIN produits p ON i.produit_id=p.id JOIN ventes v ON i.vente_id=v.id
+  FROM vente_items i JOIN products p ON i.produit_id=p.id JOIN ventes v ON i.vente_id=v.id
   WHERE v.date_vente BETWEEN ? AND ? GROUP BY p.id ORDER BY m DESC LIMIT 10");
 $topProducts->execute([$d1, $d2]);
 $topProducts = $topProducts->fetchAll(PDO::FETCH_ASSOC);

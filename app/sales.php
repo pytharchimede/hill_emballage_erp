@@ -70,7 +70,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($pid && $q > 0) {
                     // fetch product name quickly
                     $name = '';
-                    $ps = $db->prepare("SELECT nom FROM produits WHERE id=?");
+                    $ps = $db->prepare("SELECT nom FROM products WHERE id=?");
                     $ps->execute([$pid]);
                     $name = ($ps->fetch(PDO::FETCH_ASSOC)['nom'] ?? 'Produit');
                     $sti->execute([$vente_id, $pid, $name, $q, $p, $q * $p]);
@@ -158,7 +158,7 @@ $pages = max(1, (int)ceil($total / $limit));
 
 // Data for forms
 $clients = $db->query("SELECT id, COALESCE(CONCAT(nom, ' ', IFNULL(prenom,'')), nom) as label FROM clients WHERE is_active=1 ORDER BY nom")->fetchAll(PDO::FETCH_ASSOC);
-$products = $db->query("SELECT id, nom, prix_unitaire, prix_credit FROM produits WHERE is_active=1 ORDER BY nom")->fetchAll(PDO::FETCH_ASSOC);
+$products = $db->query("SELECT id, nom, prix_unitaire, prix_credit FROM products WHERE is_active=1 ORDER BY nom")->fetchAll(PDO::FETCH_ASSOC);
 
 $pageTitle = 'Ventes';
 log_action('VIEW', 'ventes');

@@ -73,18 +73,18 @@ if ($search) {
     array_push($params, $q, $q);
 }
 
-$count = $db->prepare("SELECT COUNT(*) t FROM stock s JOIN produits p ON s.produit_id=p.id JOIN depots d ON s.depot_id=d.id $where");
+$count = $db->prepare("SELECT COUNT(*) t FROM stock s JOIN products p ON s.produit_id=p.id JOIN depots d ON s.depot_id=d.id $where");
 $count->execute($params);
 $total = (int)($count->fetch(PDO::FETCH_ASSOC)['t'] ?? 0);
 $st = $db->prepare("SELECT s.*, p.nom, p.code_produit, p.unite, p.is_active as prod_active, d.nom as depot_nom
-                    FROM stock s JOIN produits p ON s.produit_id=p.id JOIN depots d ON s.depot_id=d.id
+                    FROM stock s JOIN products p ON s.produit_id=p.id JOIN depots d ON s.depot_id=d.id
                     $where ORDER BY d.nom, p.nom LIMIT $limit OFFSET $offset");
 $st->execute($params);
 $rows = $st->fetchAll(PDO::FETCH_ASSOC);
 $pages = max(1, (int)ceil($total / $limit));
 
 $depots = $db->query('SELECT id, nom FROM depots WHERE is_active=1 ORDER BY nom')->fetchAll(PDO::FETCH_ASSOC);
-$products = $db->query('SELECT id, nom FROM produits WHERE is_active=1 ORDER BY nom')->fetchAll(PDO::FETCH_ASSOC);
+$products = $db->query('SELECT id, nom FROM products WHERE is_active=1 ORDER BY nom')->fetchAll(PDO::FETCH_ASSOC);
 
 $pageTitle = 'Stock';
 include 'includes/header.php';
@@ -216,7 +216,7 @@ include 'includes/header.php';
     // total pour pagination
     $tjCount = $db->prepare("SELECT COUNT(*) AS t
                              FROM stock_transfers st
-                             JOIN produits p ON st.produit_id=p.id
+                             JOIN products p ON st.produit_id=p.id
                              JOIN depots ds ON st.depot_source=ds.id
                              JOIN depots dd ON st.depot_destination=dd.id
                              JOIN users u ON st.user_id=u.id
@@ -228,7 +228,7 @@ include 'includes/header.php';
     // liste page courante
     $tj = $db->prepare("SELECT st.*, p.nom as produit_nom, ds.nom as depot_src, dd.nom as depot_dst, u.full_name as user_nom
                         FROM stock_transfers st
-                        JOIN produits p ON st.produit_id=p.id
+                        JOIN products p ON st.produit_id=p.id
                         JOIN depots ds ON st.depot_source=ds.id
                         JOIN depots dd ON st.depot_destination=dd.id
                         JOIN users u ON st.user_id=u.id
@@ -252,8 +252,8 @@ include 'includes/header.php';
                     <option value="<?= htmlspecialchars($p['nom']) ?>"></option>
                 <?php endforeach; ?>
                 <?php
-                // ajouter aussi les codes produits distincts
-                $prodCodes = $db->query('SELECT code_produit FROM produits WHERE is_active=1 ORDER BY code_produit')->fetchAll(PDO::FETCH_COLUMN);
+                // ajouter aussi les codes products distincts
+                $prodCodes = $db->query('SELECT code_produit FROM products WHERE is_active=1 ORDER BY code_produit')->fetchAll(PDO::FETCH_COLUMN);
                 foreach ($prodCodes as $pc): ?>
                     <option value="<?= htmlspecialchars($pc) ?>"></option>
                 <?php endforeach; ?>
