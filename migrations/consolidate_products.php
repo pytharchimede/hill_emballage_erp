@@ -26,6 +26,20 @@ try {
         $stmt->execute([$name]);
         return $stmt->fetchColumn() > 0;
     };
+    $getTableType = function ($name) use ($conn) {
+        $stmt = $conn->prepare("SELECT TABLE_TYPE FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
+        $stmt->execute([$name]);
+        $t = $stmt->fetchColumn();
+        return $t ?: null; // 'BASE TABLE' ou 'VIEW'
+    };
+    $isBaseTable = function ($name) use ($getTableType) {
+        $t = $getTableType($name);
+        return strtoupper((string)$t) === 'BASE TABLE';
+    };
+    $isView = function ($name) use ($getTableType) {
+        $t = $getTableType($name);
+        return strtoupper((string)$t) === 'VIEW';
+    };
     $hasColumn = function ($table, $col) use ($conn) {
         $stmt = $conn->prepare("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?");
         $stmt->execute([$table, $col]);
@@ -36,7 +50,7 @@ try {
     $tProducts = $hasTable('products');
     echo "<p>Tables détectées: produits=" . ($tProduits ? 'oui' : 'non') . ", products=" . ($tProducts ? 'oui' : 'non') . "</p>";
 
-    // 1) Créer produits si absent
+    // 1) Créer produits si absent, ou convertir la VUE en TABLE si nécessaire
     if (!$tProduits) {
         $sql = "CREATE TABLE produits (
             id INT AUTO_INCREMENT PRIMARY KEY,
@@ -55,16 +69,54 @@ try {
         $conn->exec($sql);
         echo "<p class='ok'>✓ Table produits créée</p>";
         $tProduits = true;
+    } else {
+        // produits existe — vérifier si c'est une VUE
+        if ($isView('produits')) {
+            echo "<p class='warn'>⚠ 'produits' est une VUE. Conversion en table physique…</p>";
+            // Créer une table physique temporaire avec le schéma cible
+            // Nettoyage si une tentative précédente a laissé la table temporaire
+            try {
+                $conn->exec("DROP TABLE IF EXISTS produits_physical");
+            } catch (Exception $e) {
+            }
+            $conn->exec("CREATE TABLE produits_physical (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                nom VARCHAR(100) NOT NULL,
+                code_produit VARCHAR(50) UNIQUE NOT NULL,
+                description TEXT,
+                unite VARCHAR(20) DEFAULT 'pièce',
+                prix_unitaire DECIMAL(10,2) NOT NULL,
+                prix_credit DECIMAL(10,2) NULL,
+                points_fidelite INT DEFAULT 1,
+                image_path VARCHAR(255) NULL,
+                is_active BOOLEAN DEFAULT 1,
+                created_at TIMESTAMP NULL,
+                updated_at TIMESTAMP NULL
+            )");
+            // Insérer les données depuis la VUE 'produits' (sans image_path)
+            $insertSql = "INSERT INTO produits_physical (id, nom, code_produit, description, unite, prix_unitaire, prix_credit, points_fidelite, is_active, created_at, updated_at)
+                          SELECT id, nom, code_produit, description, unite, prix_unitaire, prix_credit, points_fidelite, IFNULL(is_active,1), created_at, updated_at FROM produits";
+            $moved = $conn->exec($insertSql);
+            echo "<p class='ok'>✓ $moved lignes copiées depuis la VUE 'produits' vers la table physique</p>";
+            // Remplacer la VUE par la TABLE
+            try {
+                $conn->exec("DROP VIEW produits");
+            } catch (Exception $e) {
+                throw new Exception("Impossible de supprimer la VUE 'produits'. Vérifiez les privilèges DROP VIEW. Détail: " . $e->getMessage());
+            }
+            $conn->exec("RENAME TABLE produits_physical TO produits");
+            echo "<p class='ok'>✓ La VUE 'produits' a été remplacée par une TABLE physique 'produits'</p>";
+        }
     }
 
-    // 2) S'assurer de la colonne image_path
-    if (!$hasColumn('produits', 'image_path')) {
+    // 2) S'assurer de la colonne image_path (maintenant produits est une TABLE)
+    if ($isBaseTable('produits') && !$hasColumn('produits', 'image_path')) {
         $conn->exec("ALTER TABLE produits ADD COLUMN image_path VARCHAR(255) NULL AFTER points_fidelite");
         echo "<p class='ok'>✓ Colonne image_path ajoutée à produits</p>";
     }
 
     // 3) Synchroniser les données depuis products -> produits
-    if ($tProducts) {
+    if ($tProducts && $isBaseTable('products')) {
         echo "<p>Synchronisation des enregistrements de products vers produits...</p>";
         $conn->exec("CREATE TEMPORARY TABLE _tmp_products AS SELECT * FROM products");
         // Insertion des nouveaux codes
@@ -92,7 +144,7 @@ try {
     }
 
     // 4) Si possible: basculer vers table unique et vue de compatibilité
-    if ($tProducts) {
+    if ($tProducts && $isBaseTable('products')) {
         // Vérifier FK vers products
         $sqlFk = "SELECT CONSTRAINT_NAME, TABLE_NAME, COLUMN_NAME
                   FROM information_schema.KEY_COLUMN_USAGE

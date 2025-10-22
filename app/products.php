@@ -29,6 +29,7 @@ function colExists(PDO $db, $table, $column)
 
 // Normaliser table/colonnes
 $tbl = colExists($db, 'products', 'id') ? 'products' : (colExists($db, 'produits', 'id') ? 'produits' : null);
+$hasImageCol = $tbl ? colExists($db, $tbl, 'image_path') : false;
 if (!$tbl) {
     include 'includes/header.php';
     echo "<div class='alert alert-error'>Table produits introuvable.</div>";
@@ -72,13 +73,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             if ($tbl === 'products') {
-                $sql = "INSERT INTO products (nom, code_produit, description, unite, prix_unitaire, prix_credit, points_fidelite, image_path, is_active) VALUES (?,?,?,?,?,?,?,?,1)";
-                $st = $db->prepare($sql);
-                $st->execute([$name, $code, $desc, $unit, $price, $price_credit, $points, $imgPath]);
+                if ($hasImageCol) {
+                    $sql = "INSERT INTO products (nom, code_produit, description, unite, prix_unitaire, prix_credit, points_fidelite, image_path, is_active) VALUES (?,?,?,?,?,?,?,?,1)";
+                    $st = $db->prepare($sql);
+                    $st->execute([$name, $code, $desc, $unit, $price, $price_credit, $points, $imgPath]);
+                } else {
+                    $sql = "INSERT INTO products (nom, code_produit, description, unite, prix_unitaire, prix_credit, points_fidelite, is_active) VALUES (?,?,?,?,?,?,?,1)";
+                    $st = $db->prepare($sql);
+                    $st->execute([$name, $code, $desc, $unit, $price, $price_credit, $points]);
+                }
             } else {
-                $sql = "INSERT INTO produits (nom, code_produit, description, unite, prix_unitaire, prix_credit, points_fidelite, image_path, is_active) VALUES (?,?,?,?,?,?,?,?,1)";
-                $st = $db->prepare($sql);
-                $st->execute([$name, $code, $desc, $unit, $price, $price_credit, $points, $imgPath]);
+                if ($hasImageCol) {
+                    $sql = "INSERT INTO produits (nom, code_produit, description, unite, prix_unitaire, prix_credit, points_fidelite, image_path, is_active) VALUES (?,?,?,?,?,?,?,?,1)";
+                    $st = $db->prepare($sql);
+                    $st->execute([$name, $code, $desc, $unit, $price, $price_credit, $points, $imgPath]);
+                } else {
+                    $sql = "INSERT INTO produits (nom, code_produit, description, unite, prix_unitaire, prix_credit, points_fidelite, is_active) VALUES (?,?,?,?,?,?,?,1)";
+                    $st = $db->prepare($sql);
+                    $st->execute([$name, $code, $desc, $unit, $price, $price_credit, $points]);
+                }
             }
             // log action
             $newId = (int)$db->lastInsertId();
@@ -97,7 +110,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $desc = trim($_POST['description'] ?? '');
             $imgSetSql = '';
             $imgVal = null;
-            if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
+            if ($hasImageCol && isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
                 $f = $_FILES['image'];
                 $allowed = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/gif' => 'gif'];
                 $mime = @mime_content_type($f['tmp_name']);
@@ -116,10 +129,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
 
-            $sql = "UPDATE $tbl SET nom=?, code_produit=?, description=?, unite=?, prix_unitaire=?, prix_credit=?, points_fidelite=?" . $imgSetSql . ", updated_at=NOW() WHERE id=?";
+            $sql = "UPDATE $tbl SET nom=?, code_produit=?, description=?, unite=?, prix_unitaire=?, prix_credit=?, points_fidelite?" . ($hasImageCol ? $imgSetSql : '') . ", updated_at=NOW() WHERE id=?";
             $st = $db->prepare($sql);
             $paramsUpd = [$name, $code, $desc, $unit, $price, $price_credit, $points];
-            if ($imgSetSql) {
+            if ($hasImageCol && $imgSetSql) {
                 $paramsUpd[] = $imgVal;
             }
             $paramsUpd[] = $id;
@@ -217,7 +230,7 @@ include 'includes/header.php';
             <?php foreach ($rows as $p): ?>
                 <tr>
                     <td>
-                        <?php if (!empty($p['image_path'])): ?>
+                        <?php if (!empty($p['image_path'] ?? null)): ?>
                             <img src="<?= htmlspecialchars($p['image_path']) ?>" alt="img" style="width:48px;height:48px;border-radius:6px;object-fit:cover;" />
                         <?php else: ?>
                             <div style="width:48px;height:48px;border-radius:6px;background:#f0f0f0;display:flex;align-items:center;justify-content:center;"><i class="fas fa-box"></i></div>
