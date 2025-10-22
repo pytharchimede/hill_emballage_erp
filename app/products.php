@@ -129,7 +129,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
 
-            $sql = "UPDATE $tbl SET nom=?, code_produit=?, description=?, unite=?, prix_unitaire=?, prix_credit=?, points_fidelite?" . ($hasImageCol ? $imgSetSql : '') . ", updated_at=NOW() WHERE id=?";
+            $sql = "UPDATE $tbl SET nom=?, code_produit=?, description=?, unite=?, prix_unitaire=?, prix_credit=?, points_fidelite=?" . ($hasImageCol ? $imgSetSql : '') . ", updated_at=NOW() WHERE id=?";
             $st = $db->prepare($sql);
             $paramsUpd = [$name, $code, $desc, $unit, $price, $price_credit, $points];
             if ($hasImageCol && $imgSetSql) {
