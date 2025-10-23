@@ -43,7 +43,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $fileName = 'u' . (int)$_SESSION['user_id'] . '_' . time() . '.' . $ext;
             $dest = $sub . DIRECTORY_SEPARATOR . $fileName;
             if (!move_uploaded_file($f['tmp_name'], $dest)) throw new Exception('Échec upload.');
-            $relPath = BASE_URL . '/web_admin/uploads/profiles/' . $fileName;
+            // URL publique correcte sous la racine du projet (et non sous /web_admin)
+            $relPath = BASE_URL . '/uploads/profiles/' . $fileName;
             // Stocker chemin relatif (web)
             $st = $db->prepare('UPDATE users SET profile_photo=?, updated_at=NOW() WHERE id=?');
             $st->execute([$relPath, $_SESSION['user_id']]);
@@ -71,11 +72,33 @@ include __DIR__ . '/../app/includes/header.php';
     <h2>Informations</h2>
     <div class="row g-3 align-items-center">
         <div class="col-auto">
-            <?php if (!empty($user['profile_photo'])): ?>
-                <img src="<?= htmlspecialchars($user['profile_photo']) ?>" alt="Photo" style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:2px solid #FFD700;" />
+            <?php
+            // Construire une URL d'image fiable en corrigeant d'anciens chemins éventuels
+            $photoUrl = trim((string)($user['profile_photo'] ?? ''));
+            if ($photoUrl !== '') {
+                if (strpos($photoUrl, '/web_admin/uploads/') !== false) {
+                    $corrected = str_replace('/web_admin/uploads/', '/uploads/', $photoUrl);
+                    // Vérifier existence du fichier pour décider d'une mise à jour silencieuse
+                    $projectRoot = realpath(dirname(__DIR__)); // c:\wamp\www\hill
+                    $fsPath = $projectRoot . str_replace(['\\'], [''], str_replace(BASE_URL, '', $corrected));
+                    if (is_file($fsPath)) {
+                        $photoUrl = $corrected;
+                        // Mise à jour du chemin stocké (une fois) pour l'utilisateur courant
+                        try {
+                            $u = $db->prepare('UPDATE users SET profile_photo=? WHERE id=?');
+                            $u->execute([$photoUrl, (int)$_SESSION['user_id']]);
+                        } catch (Exception $e) {
+                        }
+                    }
+                }
+            }
+            ?>
+            <?php if ($photoUrl !== ''): ?>
+                <img src="<?= htmlspecialchars($photoUrl) ?>" alt="Photo de profil" title="Photo de profil" style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:2px solid #FFD700;" />
             <?php else: ?>
                 <div style="width:80px;height:80px;border-radius:50%;background:#f0f0f0;display:flex;align-items:center;justify-content:center;border:2px solid #FFD700;">
-                    <i class="fas fa-user" style="font-size:32px;color:#999;"></i>
+                    <i class="fas fa-user" style="font-size:32px;color:#999;" aria-hidden="true"></i>
+                    <span class="visually-hidden">Pas de photo</span>
                 </div>
             <?php endif; ?>
         </div>
