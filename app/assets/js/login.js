@@ -19,5 +19,31 @@
         form.submit();
       }
     });
+
+    // Toggle visibilité mot de passe
+    document.addEventListener("click", function (e) {
+      var tgl = e.target.closest(".toggle-password");
+      if (!tgl) return;
+      e.preventDefault();
+      var pwd = document.getElementById("password");
+      if (!pwd) return;
+      var isText = pwd.getAttribute("type") === "text";
+      pwd.setAttribute("type", isText ? "password" : "text");
+      var icon = tgl.querySelector("i");
+      if (icon) {
+        if (isText) {
+          icon.classList.remove("fa-eye-slash");
+          icon.classList.add("fa-eye");
+        } else {
+          icon.classList.remove("fa-eye");
+          icon.classList.add("fa-eye-slash");
+        }
+      }
+      tgl.setAttribute(
+        "aria-label",
+        isText ? "Afficher le mot de passe" : "Masquer le mot de passe"
+      );
+      tgl.setAttribute("title", isText ? "Afficher" : "Masquer");
+    });
   });
 })();

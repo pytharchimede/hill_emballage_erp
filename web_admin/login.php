@@ -142,6 +142,7 @@ $pageTitle = 'Connexion - ' . APP_NAME;
 
         .form-group {
             text-align: left;
+            margin-bottom: 1.25rem;
         }
 
         .form-group .input-icon {
@@ -156,8 +157,60 @@ $pageTitle = 'Connexion - ' . APP_NAME;
             color: #999;
         }
 
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 0.4rem;
+        }
+
         .form-group .input-icon input {
+            width: 100%;
+            height: 48px;
             padding-left: 3rem;
+            padding-right: 3rem;
+            border: 1px solid #e2e2e2;
+            border-radius: 12px;
+            background: #f9fafb;
+            color: #222;
+            outline: none;
+            transition: border-color .2s ease, box-shadow .2s ease, background-color .2s ease;
+            box-shadow: inset 0 1px 2px rgba(0, 0, 0, .02);
+        }
+
+        .form-group .input-icon input::placeholder {
+            color: #a3a3a3;
+        }
+
+        .form-group .input-icon input:focus {
+            background: #fff;
+            border-color: #FFA500;
+            box-shadow: 0 0 0 3px rgba(255, 165, 0, .2);
+        }
+
+        .form-group .input-icon:focus-within i {
+            color: #FFA500;
+        }
+
+        .toggle-password {
+            position: absolute;
+            right: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            background: transparent;
+            border: none;
+            color: #999;
+            cursor: pointer;
+            padding: 0;
+            width: 32px;
+            height: 32px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .toggle-password:hover {
+            color: #333;
         }
 
         .btn-login {
@@ -234,12 +287,12 @@ $pageTitle = 'Connexion - ' . APP_NAME;
             </div>
         <?php endif; ?>
 
-        <form method="POST">
+        <form method="POST" novalidate>
             <div class="form-group">
                 <label for="email">Email ou Nom d'utilisateur</label>
                 <div class="input-icon">
                     <i class="fas fa-user"></i>
-                    <input type="text" id="email" name="email" required value="<?= htmlspecialchars($_POST['email'] ?? '') ?>" placeholder="Entrez votre email">
+                    <input type="text" id="email" name="email" required autocomplete="username" spellcheck="false" value="<?= htmlspecialchars($_POST['email'] ?? '') ?>" placeholder="Entrez votre email ou nom d'utilisateur">
                 </div>
             </div>
 
@@ -247,7 +300,10 @@ $pageTitle = 'Connexion - ' . APP_NAME;
                 <label for="password">Mot de passe</label>
                 <div class="input-icon">
                     <i class="fas fa-lock"></i>
-                    <input type="password" id="password" name="password" required placeholder="Entrez votre mot de passe">
+                    <input type="password" id="password" name="password" required autocomplete="current-password" placeholder="Entrez votre mot de passe">
+                    <button type="button" class="toggle-password" aria-label="Afficher ou masquer le mot de passe" title="Afficher/Masquer">
+                        <i class="fas fa-eye" aria-hidden="true"></i>
+                    </button>
                 </div>
             </div>
 
@@ -257,37 +313,6 @@ $pageTitle = 'Connexion - ' . APP_NAME;
             </button>
         </form>
 
-        <div class="demo-accounts">
-            <h4><i class="fas fa-users"></i> Comptes de Démonstration</h4>
-            <div class="demo-account">
-                <div>
-                    <span class="role">Administrateur</span><br>
-                    <span class="credentials">admin@hillemballage.ci / admin123</span>
-                </div>
-                <button class="quick-login" data-email="admin@hillemballage.ci" data-password="admin123">Connexion rapide</button>
-            </div>
-            <div class="demo-account">
-                <div>
-                    <span class="role">Vendeur</span><br>
-                    <span class="credentials">vendeur@hillemballage.ci / vendeur123</span>
-                </div>
-                <button class="quick-login" data-email="vendeur@hillemballage.ci" data-password="vendeur123">Connexion rapide</button>
-            </div>
-            <div class="demo-account">
-                <div>
-                    <span class="role">Livreur</span><br>
-                    <span class="credentials">livreur@hillemballage.ci / livreur123</span>
-                </div>
-                <button class="quick-login" data-email="livreur@hillemballage.ci" data-password="livreur123">Connexion rapide</button>
-            </div>
-            <div class="demo-account">
-                <div>
-                    <span class="role">Comptable</span><br>
-                    <span class="credentials">comptable@hillemballage.ci / comptable123</span>
-                </div>
-                <button class="quick-login" data-email="comptable@hillemballage.ci" data-password="comptable123">Connexion rapide</button>
-            </div>
-        </div>
     </div>
 
     <script src="<?= ASSETS_URL ?>/js/login.js"></script>
