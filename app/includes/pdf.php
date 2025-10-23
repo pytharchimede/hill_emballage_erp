@@ -6,8 +6,18 @@ if (file_exists(__DIR__ . '/../../vendor/autoload.php')) {
 }
 @include_once __DIR__ . '/../lib/tcpdf/tcpdf.php';
 if (!class_exists('TCPDF')) {
-    // Fallback FPDF embarqué (basique). Recommandé: installer TCPDF pour un rendu fiable.
-    require_once __DIR__ . '/../lib/fpdf/fpdf.php';
+    // Fallback FPDF (essaie plusieurs emplacements connus). Recommandé: installer TCPDF pour un rendu fiable.
+    $fpdfCandidates = [
+        __DIR__ . '/../lib/fpdf/fpdf.php',
+        __DIR__ . '/../../vendor/setasign/fpdf/fpdf.php',
+        __DIR__ . '/../../vendor/setasign/fpdf/src/Fpdf/Fpdf.php',
+    ];
+    foreach ($fpdfCandidates as $path) {
+        if (is_file($path)) {
+            @include_once $path;
+            break;
+        }
+    }
 }
 
 if (class_exists('TCPDF')) {
@@ -92,6 +102,19 @@ class PdfDoc extends TCPDF
 PHP;
     eval($code);
 } else {
+    // Si FPDF n'est pas disponible, on définit un shim minimal pour éviter les erreurs d'analyse/exec.
+    if (!class_exists('FPDF')) {
+        // Shim très basique: absorbe les appels de méthodes, expose la largeur de page $w.
+        // À utiliser uniquement comme secours; installez TCPDF ou FPDF en production.
+        class FPDF
+        {
+            /** largeur page A4 par défaut (mm) */
+            public $w = 210;
+            public function __call($name, $arguments)
+            { /* no-op */
+            }
+        }
+    }
     class PdfDoc extends FPDF
     {
         public $titleText = APP_NAME;
