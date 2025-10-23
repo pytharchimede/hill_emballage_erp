@@ -31,6 +31,18 @@ try {
 
     $existsProducts = $hasTable('products');
     $existsProduits = $hasTable('produits');
+    // Si 'products' n'existe pas mais 'produits' est une TABLE: la renommer en 'products' pour canoniser
+    if (!$existsProducts && $existsProduits && strtoupper((string)$getTableType('produits')) === 'BASE TABLE') {
+        $db->exec("RENAME TABLE produits TO products");
+        echo "<p class='ok'>✓ Table 'produits' renommée en 'products' (canonisation)</p>";
+        $existsProducts = true;
+        $existsProduits = false; // l'ancien nom n'existe plus
+        // Créer une vue 'produits' de compat
+        try {
+            $db->exec("CREATE VIEW produits AS SELECT id, nom, code_produit, description, unite, prix_unitaire, prix_credit, points_fidelite, image_path, is_active, created_at, updated_at FROM products");
+        } catch (Exception $e) {
+        }
+    }
     if (!$existsProducts) throw new Exception("La table 'products' n'existe pas — impossible de canoniser.");
 
     // 1) Réécrire les FKs qui pointent vers 'produits' -> 'products'
