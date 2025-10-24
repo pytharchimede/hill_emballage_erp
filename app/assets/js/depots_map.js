@@ -1,5 +1,6 @@
 "use strict";
 (function () {
+  const BASE = document.querySelector('meta[name="base-url"]')?.content || "";
   const mapEl = document.getElementById("map");
   if (!mapEl || !window.L) return;
 
@@ -37,7 +38,7 @@
 
   async function loadDepots() {
     try {
-      const res = await fetch("ajax/depots_list.php", {
+      const res = await fetch(`${BASE}/app/ajax/depots_list.php`, {
         headers: { Accept: "application/json" },
       });
       if (!res.ok) return [];
@@ -158,9 +159,12 @@
       return;
     }
     try {
-      const res = await fetch("ajax/geocode.php?q=" + encodeURIComponent(q), {
-        headers: { Accept: "application/json" },
-      });
+      const res = await fetch(
+        `${BASE}/app/ajax/geocode.php?q=` + encodeURIComponent(q),
+        {
+          headers: { Accept: "application/json" },
+        }
+      );
       if (!res.ok) {
         clearList();
         return;

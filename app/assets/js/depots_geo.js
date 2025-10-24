@@ -1,6 +1,7 @@
 "use strict";
 
 (function () {
+  const BASE = document.querySelector('meta[name="base-url"]')?.content || "";
   const DEFAULT_CENTER = [5.345317, -4.024429]; // Abidjan
 
   function debounce(fn, delay) {
@@ -112,9 +113,12 @@
         return;
       }
       try {
-        const res = await fetch("ajax/geocode.php?q=" + encodeURIComponent(q), {
-          headers: { Accept: "application/json" },
-        });
+        const res = await fetch(
+          `${BASE}/app/ajax/geocode.php?q=` + encodeURIComponent(q),
+          {
+            headers: { Accept: "application/json" },
+          }
+        );
         if (!res.ok) {
           clearList();
           return;
@@ -199,6 +203,36 @@
       setVal("edit_latitude", btn.dataset.latitude || "");
     if (btn.dataset.longitude !== undefined)
       setVal("edit_longitude", btn.dataset.longitude || "");
+
+    // Si une adresse existe mais pas de lat/lon, tenter de géocoder immédiatement (comportement à la Yango)
+    const addr = (btn.dataset.adresse || "").trim();
+    const latNow = (btn.dataset.latitude || "").trim();
+    const lonNow = (btn.dataset.longitude || "").trim();
+    if (addr && (!latNow || !lonNow)) {
+      fetch(`${BASE}/app/ajax/geocode.php?q=` + encodeURIComponent(addr), {
+        headers: { Accept: "application/json" },
+      })
+        .then((r) => (r.ok ? r.json() : []))
+        .then((arr) => {
+          if (!Array.isArray(arr) || !arr.length) return;
+          const first = arr[0];
+          const la = parseFloat(first.lat),
+            lo = parseFloat(first.lon);
+          if (isNaN(la) || isNaN(lo)) return;
+          const latEl = document.getElementById("edit_latitude");
+          const lonEl = document.getElementById("edit_longitude");
+          if (latEl && lonEl) {
+            latEl.value = la.toFixed(6);
+            lonEl.value = lo.toFixed(6);
+          }
+          if (editMapCtl && editMapCtl.init) editMapCtl.init();
+          if (editMapCtl && editMapCtl.marker && editMapCtl.map) {
+            editMapCtl.marker.setLatLng([la, lo]);
+            editMapCtl.map.setView([la, lo], 15);
+          }
+        })
+        .catch(() => {});
+    }
   });
 
   // Création

@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= $pageTitle ?? APP_NAME ?></title>
+    <meta name="base-url" content="<?= BASE_URL ?>">
 
     <!-- FontAwesome pour les icônes -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
@@ -428,6 +429,7 @@
     <script src="<?= ASSETS_URL ?>/js/fallback.js"></script>
     <script src="<?= ASSETS_URL ?>/js/menu.js"></script>
     <script src="<?= ASSETS_URL ?>/js/table2cards.js"></script>
+    <script src="<?= ASSETS_URL ?>/js/app-base.js"></script>
 
     <?php if (isLoggedIn()): ?>
         <nav class="navbar">
