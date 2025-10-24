@@ -28,6 +28,26 @@ class User {
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
+    DateTime? _parseDate(dynamic v) {
+      if (v == null) return null;
+      if (v is DateTime) return v;
+      final s = v.toString().trim();
+      if (s.isEmpty) return null;
+      // Accepte formats MySQL "YYYY-MM-DD HH:MM:SS" ou ISO8601
+      final iso = s.contains('T') ? s : s.replaceFirst(' ', 'T');
+      try {
+        return DateTime.parse(iso);
+      } catch (_) {
+        return null;
+      }
+    }
+
+    bool _toBool(dynamic v) {
+      if (v is bool) return v;
+      final s = v?.toString() ?? '0';
+      return s == '1' || s.toLowerCase() == 'true';
+    }
+
     return User(
       id: json['id'],
       username: json['username'],
@@ -37,11 +57,9 @@ class User {
       phone: json['phone'],
       depotId: json['depot_id'],
       depotNom: json['depot_nom'],
-      isActive: json['is_active'] == 1,
-      lastLogin: json['last_login'] != null
-          ? DateTime.parse(json['last_login'])
-          : null,
-      createdAt: DateTime.parse(json['created_at']),
+      isActive: _toBool(json['is_active']),
+      lastLogin: _parseDate(json['last_login']),
+      createdAt: _parseDate(json['created_at']) ?? DateTime.now(),
     );
   }
 

@@ -8,6 +8,7 @@ class ApiService {
   static const String baseUrl = 'https://app.hillemballage.ci/backend/requests';
   static Map<String, String> _defaultHeaders = {
     'Content-Type': 'application/json',
+    'Accept': 'application/json',
   };
   static final http.Client _client = createHttpClient();
 
