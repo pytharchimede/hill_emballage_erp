@@ -571,6 +571,7 @@ include 'includes/header.php';
                                             $nCompany = $client['company'] ?? ($client['entreprise'] ?? '');
                                             $nCtype = $client['client_type'] ?? ($client['type_client'] ?? '');
                                             $nLivreurId = isset($client['livreur_id']) ? (int)$client['livreur_id'] : '';
+                                            $nLivreurNom = $client['livreur_nom'] ?? '';
                                             ?>
                                             <button class="btn-icon btn-primary btn-edit-client"
                                                 data-id="<?= $nId ?>"
@@ -582,7 +583,8 @@ include 'includes/header.php';
                                                 data-postal-code="<?= htmlspecialchars($nPostal) ?>"
                                                 data-company="<?= htmlspecialchars($nCompany) ?>"
                                                 data-client-type="<?= htmlspecialchars($nCtype) ?>"
-                                                data-livreur-id="<?= $nLivreurId ?>">
+                                                data-livreur-id="<?= $nLivreurId ?>"
+                                                data-livreur-nom="<?= htmlspecialchars($nLivreurNom) ?>">
                                                 <i class="fas fa-edit"></i>
                                             </button>
                                         <?php endif; ?>
@@ -760,6 +762,7 @@ include 'includes/header.php';
                                         <option value="<?= (int)$u['id'] ?>"><?= htmlspecialchars($u['full_name']) ?></option>
                                     <?php endforeach; ?>
                                 </select>
+                                <div class="form-text" id="edit_livreur_current">&nbsp;</div>
                                 <small class="text-muted">Admin: tous les livreurs. Vendeur: livreurs de son dépôt. Livreur: non modifiable.</small>
                             </div>
                         </div>
@@ -1124,6 +1127,6 @@ include 'includes/header.php';
     }
 </style>
 
-<script src="assets/js/clients.js"></script>
+<script src="<?= BASE_URL ?>/app/assets/js/clients.js"></script>
 
 <?php include 'includes/footer.php'; ?>

@@ -52,6 +52,15 @@
         livSel.value = "";
       }
     }
+
+    // Affichage du livreur actuel
+    const livInfo = document.getElementById("edit_livreur_current");
+    if (livInfo) {
+      const name = d.livreurNom || "";
+      livInfo.textContent = name
+        ? `Livreur actuel : ${name}`
+        : "Livreur actuel : Aucun";
+    }
   }
 
   function attachEvents() {
