@@ -32,6 +32,27 @@ function columnExists(PDO $db, $table, $column)
     }
 }
 
+// Détection robuste du nom de colonne rôle dans users (role, user_role, profil, type, fonction)
+function detectUserRoleColumn(PDO $db)
+{
+    static $cache = null;
+    if ($cache !== null) return $cache;
+    $candidates = ['role', 'user_role', 'profil', 'type', 'fonction'];
+    foreach ($candidates as $col) {
+        try {
+            $stmt = $db->prepare("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = ?");
+            $stmt->execute([$col]);
+            if ((int)$stmt->fetchColumn() > 0) {
+                $cache = $col;
+                return $cache;
+            }
+        } catch (Exception $e) {
+        }
+    }
+    $cache = null;
+    return $cache;
+}
+
 // Traitement des actions
 $message = '';
 $messageType = '';
@@ -411,10 +432,10 @@ include 'includes/header.php';
                 <a href="clients.php" class="btn btn-outline">
                     <i class="fas fa-times"></i> Reset
                 </a>
-                <a class="btn" href="<?= BASE_URL ?>/app/export/clients_xls.php?search=<?= urlencode($search) ?>">
+                <a class="btn" href="<?= BASE_URL ?>/app/export/clients_xls.php?search=<?= urlencode($search) ?>&filter=<?= urlencode($filter) ?>&affect=<?= urlencode($affect) ?>">
                     <i class="fas fa-file-excel"></i> Export XLS
                 </a>
-                <a class="btn" href="<?= BASE_URL ?>/app/export/clients_pdf.php?search=<?= urlencode($search) ?>">
+                <a class="btn" href="<?= BASE_URL ?>/app/export/clients_pdf.php?search=<?= urlencode($search) ?>&filter=<?= urlencode($filter) ?>&affect=<?= urlencode($affect) ?>">
                     <i class="fas fa-file-pdf"></i> Export PDF
                 </a>
             </div>
@@ -442,6 +463,11 @@ include 'includes/header.php';
                     $role = $_SESSION['user_role'] ?? '';
                     $sqlU = "SELECT id, full_name, depot_id FROM users WHERE 1=1";
                     $paramsU = [];
+                    $roleCol = detectUserRoleColumn($db);
+                    if ($roleCol) {
+                        $sqlU .= " AND $roleCol = ?";
+                        $paramsU[] = 'livreur';
+                    }
                     if ($role === 'vendeur') {
                         $sqlU .= " AND depot_id = ?";
                         $paramsU[] = (int)($_SESSION['depot_id'] ?? 0);
@@ -617,7 +643,7 @@ include 'includes/header.php';
 <?php if ($totalPages > 1): ?>
     <div class="pagination">
         <?php for ($i = 1; $i <= $totalPages; $i++): ?>
-            <a href="?page=<?= $i ?>&search=<?= urlencode($search) ?>&filter=<?= urlencode($filter) ?>"
+            <a href="?page=<?= $i ?>&search=<?= urlencode($search) ?>&filter=<?= urlencode($filter) ?>&affect=<?= urlencode($affect) ?>"
                 class="page-link <?= $i === $page ? 'active' : '' ?>">
                 <?= $i ?>
             </a>
@@ -648,6 +674,11 @@ include 'includes/header.php';
                                     $role = $_SESSION['user_role'] ?? '';
                                     $sqlU = "SELECT id, full_name, depot_id FROM users WHERE 1=1";
                                     $paramsU = [];
+                                    $roleCol = detectUserRoleColumn($db);
+                                    if ($roleCol) {
+                                        $sqlU .= " AND $roleCol = ?";
+                                        $paramsU[] = 'livreur';
+                                    }
                                     if ($role === 'vendeur') {
                                         $sqlU .= " AND depot_id = ?";
                                         $paramsU[] = (int)($_SESSION['depot_id'] ?? 0);
@@ -750,6 +781,11 @@ include 'includes/header.php';
                                     $role = $_SESSION['user_role'] ?? '';
                                     $sqlU = "SELECT id, full_name, depot_id FROM users WHERE 1=1";
                                     $paramsU = [];
+                                    $roleCol = detectUserRoleColumn($db);
+                                    if ($roleCol) {
+                                        $sqlU .= " AND $roleCol = ?";
+                                        $paramsU[] = 'livreur';
+                                    }
                                     if ($role === 'vendeur') {
                                         $sqlU .= " AND depot_id = ?";
                                         $paramsU[] = (int)($_SESSION['depot_id'] ?? 0);
