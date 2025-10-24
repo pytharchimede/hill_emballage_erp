@@ -15,7 +15,7 @@
 
 <IfModule mod_headers.c>
   # Content Security Policy: pas de scripts inline; autoriser nos fichiers et les CDNs utilisés
-  Header always set Content-Security-Policy "default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'; img-src 'self' data: blob:; connect-src 'self'; font-src 'self' https://cdnjs.cloudflare.com data:; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; script-src 'self' https://cdn.jsdelivr.net https://code.jquery.com"
+  Header always set Content-Security-Policy "default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'; img-src 'self' data: blob: https://cdn.jsdelivr.net https://*.tile.openstreetmap.org; connect-src 'self'; font-src 'self' https://cdnjs.cloudflare.com data:; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; script-src 'self' https://cdn.jsdelivr.net https://code.jquery.com"
   # Désactiver sniffing
   Header always set X-Content-Type-Options "nosniff"
   # Clickjacking

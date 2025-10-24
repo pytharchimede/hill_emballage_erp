@@ -229,7 +229,17 @@ include 'includes/header.php';
                     <?php endif; ?>
                     <td>
                         <?php if (hasPermission('depots_update')): ?>
-                            <button class="btn btn-sm btn-edit-depot" type="button" data-id="<?= (int)$d['id'] ?>"><i class="fas fa-edit"></i></button>
+                            <button class="btn btn-sm btn-edit-depot" type="button"
+                                data-id="<?= (int)$d['id'] ?>"
+                                data-nom="<?= htmlspecialchars($d['nom']) ?>"
+                                data-adresse="<?= htmlspecialchars($d['adresse']) ?>"
+                                data-responsable="<?= htmlspecialchars($d['responsable']) ?>"
+                                data-telephone="<?= htmlspecialchars($d['telephone']) ?>"
+                                <?php if ($hasEmail): ?>data-email="<?= htmlspecialchars($d['email'] ?? '') ?>" <?php endif; ?>
+                                <?php if ($hasLat && $hasLng): ?>data-latitude="<?= htmlspecialchars($d['latitude'] ?? '') ?>" data-longitude="<?= htmlspecialchars($d['longitude'] ?? '') ?>" <?php endif; ?>
+                                data-bs-toggle="modal" data-bs-target="#editDepotModal">
+                                <i class="fas fa-edit"></i>
+                            </button>
                         <?php endif; ?>
                         <?php if (hasPermission('depots_delete')): ?>
                             <form method="post" style="display:inline">
@@ -270,13 +280,23 @@ include 'includes/header.php';
                         <div class="row g-3">
                             <div class="col-md-6 form-group"><label>Nom</label><input class="form-control" name="nom" required /></div>
                             <div class="col-md-6 form-group"><label>Responsable</label><input class="form-control" name="responsable" /></div>
-                            <div class="col-md-12 form-group"><label>Adresse</label><input class="form-control" name="adresse" /></div>
                             <div class="col-md-6 form-group"><label>Téléphone</label><input class="form-control" name="telephone" /></div>
                             <?php if ($hasEmail): ?><div class="col-md-6 form-group"><label>Email</label><input class="form-control" type="email" name="email" /></div><?php endif; ?>
                             <?php if ($hasHoraires): ?><div class="col-md-12 form-group"><label>Horaires</label><input class="form-control" name="horaires" placeholder="Ex: Lun-Sam 08:00-18:00" /></div><?php endif; ?>
+                            <div class="col-md-12 form-group position-relative">
+                                <label>Localisation (adresse)</label>
+                                <div class="input-group">
+                                    <input class="form-control" name="adresse" id="create_adresse" autocomplete="off" placeholder="Tapez un lieu, une adresse, un quartier..." />
+                                    <button class="btn btn-outline-secondary" type="button" id="create_locate_btn" title="Ma position"><i class="fas fa-location-crosshairs"></i></button>
+                                </div>
+                                <div id="create_address_suggestions" class="list-group" style="position:absolute; z-index:1080; width:100%; max-height:220px; overflow:auto; display:none;"></div>
+                            </div>
                             <?php if ($hasLat && $hasLng): ?>
-                                <div class="col-md-6 form-group"><label>Latitude</label><input class="form-control" type="number" step="0.000001" name="latitude" /></div>
-                                <div class="col-md-6 form-group"><label>Longitude</label><input class="form-control" type="number" step="0.000001" name="longitude" /></div>
+                                <input type="hidden" name="latitude" id="create_latitude" />
+                                <input type="hidden" name="longitude" id="create_longitude" />
+                                <div class="col-12">
+                                    <div id="create_map" style="width:100%; height:300px; border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,.08);"></div>
+                                </div>
                             <?php endif; ?>
                         </div>
                     </div>
@@ -295,9 +315,9 @@ include 'includes/header.php';
         <div class="modal-dialog modal-dialog-centered modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title"><i class="fas fa-edit"></i> Modifier le dépôt</h5>
+                    <h5 class="modal-title"><i class="fas fa-edit"></i> Modifier un dépôt</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
+                </div>div>
                 <form method="post">
                     <input type="hidden" name="action" value="update" />
                     <input type="hidden" name="id" id="edit_id" />
@@ -305,13 +325,23 @@ include 'includes/header.php';
                         <div class="row g-3">
                             <div class="col-md-6 form-group"><label>Nom</label><input class="form-control" name="nom" id="edit_nom" required /></div>
                             <div class="col-md-6 form-group"><label>Responsable</label><input class="form-control" name="responsable" id="edit_responsable" /></div>
-                            <div class="col-md-12 form-group"><label>Adresse</label><input class="form-control" name="adresse" id="edit_adresse" /></div>
                             <div class="col-md-6 form-group"><label>Téléphone</label><input class="form-control" name="telephone" id="edit_telephone" /></div>
                             <?php if ($hasEmail): ?><div class="col-md-6 form-group"><label>Email</label><input class="form-control" type="email" name="email" id="edit_email" /></div><?php endif; ?>
                             <?php if ($hasHoraires): ?><div class="col-md-12 form-group"><label>Horaires</label><input class="form-control" name="horaires" id="edit_horaires" /></div><?php endif; ?>
+                            <div class="col-md-12 form-group position-relative">
+                                <label>Localisation (adresse)</label>
+                                <div class="input-group">
+                                    <input class="form-control" name="adresse" id="edit_adresse" autocomplete="off" placeholder="Tapez un lieu, une adresse, un quartier..." />
+                                    <button class="btn btn-outline-secondary" type="button" id="edit_locate_btn" title="Ma position"><i class="fas fa-location-crosshairs"></i></button>
+                                </div>
+                                <div id="edit_address_suggestions" class="list-group" style="position:absolute; z-index:1080; width:100%; max-height:220px; overflow:auto; display:none;"></div>
+                            </div>
                             <?php if ($hasLat && $hasLng): ?>
-                                <div class="col-md-6 form-group"><label>Latitude</label><input class="form-control" type="number" step="0.000001" name="latitude" id="edit_latitude" /></div>
-                                <div class="col-md-6 form-group"><label>Longitude</label><input class="form-control" type="number" step="0.000001" name="longitude" id="edit_longitude" /></div>
+                                <input type="hidden" name="latitude" id="edit_latitude" />
+                                <input type="hidden" name="longitude" id="edit_longitude" />
+                                <div class="col-12">
+                                    <div id="edit_map" style="width:100%; height:300px; border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,.08);"></div>
+                                </div>
                             <?php endif; ?>
                         </div>
                     </div>
@@ -322,42 +352,11 @@ include 'includes/header.php';
                 </form>
             </div>
         </div>
-    </div>
-    <script>
-        // Édition (JS sans inline handlers)
-        document.addEventListener('click', function(e) {
-            const btn = e.target.closest('.btn-edit-depot');
-            if (!btn) return;
-            const row = btn.closest('tr');
-            if (!row) return;
-            const tds = row.querySelectorAll('td');
-            const id = parseInt(btn.getAttribute('data-id'), 10);
-            document.getElementById('edit_id').value = id;
-            document.getElementById('edit_nom').value = (tds[0]?.innerText || '').trim();
-            document.getElementById('edit_adresse').value = (tds[1]?.innerText || '').trim();
-            document.getElementById('edit_responsable').value = (tds[2]?.innerText || '').trim();
-            document.getElementById('edit_telephone').value = (tds[3]?.innerText || '').trim();
-            <?php if ($hasEmail): ?>
-                document.getElementById('edit_email').value = (tds[4]?.innerText || '').trim();
-            <?php endif; ?>
-            <?php if ($hasLat && $hasLng): ?>
-                const coordIndex = <?= ($hasEmail ? 5 : 4) ?>;
-                const coordText = (tds[coordIndex]?.innerText || '').trim();
-                const parts = coordText.split(',').map(s => s.trim());
-                document.getElementById('edit_latitude').value = parts[0] || '';
-                document.getElementById('edit_longitude').value = parts[1] || '';
-            <?php endif; ?>
-            const el = document.getElementById('editDepotModal');
-            if (window.bootstrap && window.bootstrap.Modal) {
-                new bootstrap.Modal(el).show();
-            } else if (window.__fallbackShowModal) {
-                window.__fallbackShowModal('editDepotModal');
-            } else {
-                el.classList.add('show');
-                el.style.display = 'block';
-            }
-        });
-    </script>
-<?php endif; ?>
+    <?php endif; ?>
 
-<?php include 'includes/footer.php'; ?>
+    <!-- Carte & Autocomplete: assets globaux pour création/édition (CSP-friendly) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" crossorigin="anonymous" />
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js" crossorigin="anonymous"></script>
+    <script src="<?= ASSETS_URL ?>/js/depots_geo.js"></script>
+
+    <?php include 'includes/footer.php'; ?>
