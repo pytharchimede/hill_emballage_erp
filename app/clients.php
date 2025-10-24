@@ -271,6 +271,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $search = $_GET['search'] ?? '';
 $filter = $_GET['filter'] ?? 'all';
 $affect = $_GET['affect'] ?? 'all';
+$livreurFilter = isset($_GET['livreur']) ? (int)$_GET['livreur'] : 0;
 $page = max(1, intval($_GET['page'] ?? 1));
 $limit = 20;
 $offset = ($page - 1) * $limit;
@@ -311,6 +312,12 @@ if ($userRole === 'livreur' || $userRole === 'commercial') {
 // Filtre "Sans livreur"
 if ($affect === 'none' && columnExists($db, 'clients', 'livreur_id')) {
     $whereClause .= " AND c.livreur_id IS NULL";
+}
+
+// Filtre par livreur précis (admin/vendeur)
+if ($livreurFilter > 0 && in_array($userRole, ['admin', 'vendeur'], true) && columnExists($db, 'clients', 'livreur_id')) {
+    $whereClause .= " AND c.livreur_id = ?";
+    $params[] = $livreurFilter;
 }
 
 // Recherche
@@ -413,6 +420,37 @@ include 'includes/header.php';
                         <option value="none" <?= $affect === 'none' ? 'selected' : '' ?>>Sans livreur</option>
                     </select>
                 </div>
+                <div class="filter-group" style="min-width:260px">
+                    <label for="livreur" class="form-label">Par livreur</label>
+                    <select name="livreur" id="livreur" class="form-select filter-select">
+                        <option value="0">Tous les livreurs</option>
+                        <?php
+                        // Charger la liste des livreurs (filtrés pour vendeur par dépôt)
+                        $role = $_SESSION['user_role'] ?? '';
+                        $sqlU = "SELECT id, full_name, depot_id FROM users WHERE 1=1";
+                        $paramsU = [];
+                        $roleCol = detectUserRoleColumn($db);
+                        if ($roleCol) {
+                            $sqlU .= " AND $roleCol = ?";
+                            $paramsU[] = 'livreur';
+                        }
+                        if ($role === 'vendeur') {
+                            $sqlU .= " AND depot_id = ?";
+                            $paramsU[] = (int)($_SESSION['depot_id'] ?? 0);
+                        }
+                        $sqlU .= " ORDER BY full_name";
+                        try {
+                            $lus = $db->prepare($sqlU);
+                            $lus->execute($paramsU);
+                            $uls = $lus->fetchAll(PDO::FETCH_ASSOC);
+                        } catch (Exception $e) {
+                            $uls = [];
+                        }
+                        foreach ($uls as $u): ?>
+                            <option value="<?= (int)$u['id'] ?>" <?= $livreurFilter === (int)$u['id'] ? 'selected' : '' ?>><?= htmlspecialchars($u['full_name']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
             <?php endif; ?>
 
             <div class="filter-group" style="min-width:220px">
@@ -432,10 +470,10 @@ include 'includes/header.php';
                 <a href="clients.php" class="btn btn-outline">
                     <i class="fas fa-times"></i> Reset
                 </a>
-                <a class="btn" href="<?= BASE_URL ?>/app/export/clients_xls.php?search=<?= urlencode($search) ?>&filter=<?= urlencode($filter) ?>&affect=<?= urlencode($affect) ?>">
+                <a class="btn" href="<?= BASE_URL ?>/app/export/clients_xls.php?search=<?= urlencode($search) ?>&filter=<?= urlencode($filter) ?>&affect=<?= urlencode($affect) ?>&livreur=<?= urlencode((string)$livreurFilter) ?>">
                     <i class="fas fa-file-excel"></i> Export XLS
                 </a>
-                <a class="btn" href="<?= BASE_URL ?>/app/export/clients_pdf.php?search=<?= urlencode($search) ?>&filter=<?= urlencode($filter) ?>&affect=<?= urlencode($affect) ?>">
+                <a class="btn" href="<?= BASE_URL ?>/app/export/clients_pdf.php?search=<?= urlencode($search) ?>&filter=<?= urlencode($filter) ?>&affect=<?= urlencode($affect) ?>&livreur=<?= urlencode((string)$livreurFilter) ?>">
                     <i class="fas fa-file-pdf"></i> Export PDF
                 </a>
             </div>
@@ -603,7 +641,7 @@ include 'includes/header.php';
                                             $nLivreurId = isset($client['livreur_id']) ? (int)$client['livreur_id'] : '';
                                             $nLivreurNom = $client['livreur_nom'] ?? '';
                                             ?>
-                                            <button class="btn-icon btn-primary btn-edit-client"
+                                            <button type="button" class="btn-icon btn-primary btn-edit-client"
                                                 data-id="<?= $nId ?>"
                                                 data-name="<?= htmlspecialchars($nName) ?>"
                                                 data-email="<?= htmlspecialchars($nEmail) ?>"
@@ -620,7 +658,7 @@ include 'includes/header.php';
                                         <?php endif; ?>
 
                                         <?php if (hasPermission('clients_delete')): ?>
-                                            <button class="btn-icon btn-danger btn-delete-client"
+                                            <button type="button" class="btn-icon btn-danger btn-delete-client"
                                                 data-id="<?= (int)$client['id'] ?>"
                                                 data-name="<?= htmlspecialchars($displayName) ?>">
                                                 <i class="fas fa-trash"></i>
@@ -643,7 +681,7 @@ include 'includes/header.php';
 <?php if ($totalPages > 1): ?>
     <div class="pagination">
         <?php for ($i = 1; $i <= $totalPages; $i++): ?>
-            <a href="?page=<?= $i ?>&search=<?= urlencode($search) ?>&filter=<?= urlencode($filter) ?>&affect=<?= urlencode($affect) ?>"
+            <a href="?page=<?= $i ?>&search=<?= urlencode($search) ?>&filter=<?= urlencode($filter) ?>&affect=<?= urlencode($affect) ?>&livreur=<?= urlencode((string)$livreurFilter) ?>"
                 class="page-link <?= $i === $page ? 'active' : '' ?>">
                 <?= $i ?>
             </a>
@@ -775,7 +813,8 @@ include 'includes/header.php';
                         <div class="form-row">
                             <div class="form-group">
                                 <label for="edit_livreur">Affecter à un livreur</label>
-                                <select id="edit_livreur" name="livreur_id">
+                                <?php $disableLivSelect = in_array($userRole, ['livreur', 'commercial'], true); ?>
+                                <select id="edit_livreur" name="livreur_id" <?= $disableLivSelect ? 'disabled' : '' ?>>
                                     <option value="">— Aucun —</option>
                                     <?php
                                     $role = $_SESSION['user_role'] ?? '';
