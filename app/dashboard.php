@@ -67,6 +67,7 @@ try {
         // Détecter colonnes utiles
         $hasLivreurId = (int)$scalar("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ventes' AND COLUMN_NAME = 'livreur_id'") > 0;
         $hasDeliveryDate = (int)$scalar("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ventes' AND COLUMN_NAME = 'delivery_date'") > 0;
+        $hasDeliveryMode = (int)$scalar("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ventes' AND COLUMN_NAME = 'delivery_mode'") > 0;
 
         // Filtres d'affectation: priorité au livreur_id si dispo, sinon fallback dépôt
         $filterCol = $hasLivreurId ? 'livreur_id' : 'depot_id';
@@ -74,21 +75,21 @@ try {
 
         // Livraisons du jour (terminées)
         if ($hasDeliveryDate) {
-            $stats['deliveries_today'] = (int)$scalar("SELECT COUNT(*) FROM ventes WHERE $filterCol = ? AND statut = 'livree' AND delivery_date = CURDATE()", [$filterVal]);
+            $stats['deliveries_today'] = (int)$scalar("SELECT COUNT(*) FROM ventes WHERE $filterCol = ? AND statut = 'livree' AND delivery_date = CURDATE()" . ($hasDeliveryMode ? " AND delivery_mode='livraison'" : ""), [$filterVal]);
         } else {
-            $stats['deliveries_today'] = (int)$scalar("SELECT COUNT(*) FROM ventes WHERE $filterCol = ? AND statut = 'livree' AND DATE(updated_at) = CURDATE()", [$filterVal]);
+            $stats['deliveries_today'] = (int)$scalar("SELECT COUNT(*) FROM ventes WHERE $filterCol = ? AND statut = 'livree' AND DATE(updated_at) = CURDATE()" . ($hasDeliveryMode ? " AND delivery_mode='livraison'" : ""), [$filterVal]);
         }
 
         // Livraisons en attente (du jour si possible)
         if ($hasDeliveryDate) {
-            $stats['pending_deliveries'] = (int)$scalar("SELECT COUNT(*) FROM ventes WHERE $filterCol = ? AND statut = 'validee' AND delivery_date = CURDATE()", [$filterVal]);
+            $stats['pending_deliveries'] = (int)$scalar("SELECT COUNT(*) FROM ventes WHERE $filterCol = ? AND statut IN ('en_attente','validee') AND delivery_date = CURDATE()" . ($hasDeliveryMode ? " AND delivery_mode='livraison'" : ""), [$filterVal]);
         } else {
-            // fallback: sans date planifiée, afficher toutes les validées
-            $stats['pending_deliveries'] = (int)$scalar("SELECT COUNT(*) FROM ventes WHERE $filterCol = ? AND statut = 'validee'", [$filterVal]);
+            // fallback: sans date planifiée, afficher toutes les en_attente/validées
+            $stats['pending_deliveries'] = (int)$scalar("SELECT COUNT(*) FROM ventes WHERE $filterCol = ? AND statut IN ('en_attente','validee')" . ($hasDeliveryMode ? " AND delivery_mode='livraison'" : ""), [$filterVal]);
         }
 
         // Livraisons terminées (toutes)
-        $stats['completed_deliveries'] = (int)$scalar("SELECT COUNT(*) FROM ventes WHERE $filterCol = ? AND statut = 'livree'", [$filterVal]);
+        $stats['completed_deliveries'] = (int)$scalar("SELECT COUNT(*) FROM ventes WHERE $filterCol = ? AND statut = 'livree'" . ($hasDeliveryMode ? " AND delivery_mode='livraison'" : ""), [$filterVal]);
 
         // Clients du dépôt (inchangé)
         $stats['total_clients'] = (int)$scalar("SELECT COUNT(*) FROM clients WHERE depot_id = ? AND is_active = 1", [$depotId]);

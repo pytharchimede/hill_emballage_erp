@@ -35,6 +35,7 @@ $hasLat = colExistsAjax($db, 'ventes', 'delivery_latitude');
 $hasLng = colExistsAjax($db, 'ventes', 'delivery_longitude');
 $hasAddr = colExistsAjax($db, 'ventes', 'delivery_address');
 $hasDelivDate = colExistsAjax($db, 'ventes', 'delivery_date');
+$hasMode = colExistsAjax($db, 'ventes', 'delivery_mode');
 
 $where = [];
 $params = [];
@@ -46,15 +47,21 @@ if ($hasLivreurId) {
     $params[] = $depotId;
 }
 
+// Restreindre aux ventes en mode livraison si la colonne existe
+if ($hasMode) {
+    $where[] = "v.delivery_mode = 'livraison'";
+}
+
 if ($scope === 'pending') {
-    $where[] = "v.statut = 'validee'";
+    $where[] = "v.statut IN ('en_attente','validee')";
 } elseif ($scope === 'today') {
     if ($hasDelivDate) {
         $where[] = 'v.delivery_date = CURDATE()';
     } else {
         $where[] = 'DATE(v.created_at) = CURDATE()';
     }
-    $where[] = "v.statut IN ('validee','livree')";
+    // Inclure les livraisons planifiées/en cours/terminées du jour
+    $where[] = "v.statut IN ('en_attente','validee','livree')";
 }
 // 'all' no extra filter
 
@@ -67,7 +74,7 @@ $select = "SELECT v.id, v.numero_vente, v.statut, v.created_at, v.updated_at, v.
                   " . ($hasLng ? 'v.delivery_longitude' : 'NULL') . " as lon,
                   c.nom as client_nom, c.prenom as client_prenom, c.entreprise
            FROM ventes v LEFT JOIN clients c ON v.client_id=c.id $whereSql
-           ORDER BY v.statut='validee' DESC, v.created_at ASC LIMIT 500";
+           ORDER BY (v.statut='validee') DESC, (v.statut='en_attente') DESC, " . ($hasDelivDate ? 'v.delivery_date' : 'v.created_at') . " ASC LIMIT 500";
 
 try {
     $st = $db->prepare($select);
