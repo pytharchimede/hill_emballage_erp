@@ -29,9 +29,9 @@ function columnExists(PDO $db, $table, $column)
     return (int)$s->fetch(PDO::FETCH_ASSOC)['c'] > 0;
 }
 
-$hasVenteDate = columnExists($db, 'ventes', 'date_vente');
-// Utiliser COALESCE pour inclure les ventes dont date_vente est NULL
-$venteDateExpr = $hasVenteDate ? 'COALESCE(v.date_vente, DATE(v.created_at))' : 'DATE(v.created_at)';
+// Pour des KPI cohérents avec vos données actuelles, on base les dates de chiffre d'affaires sur la date de création
+// (certaines ventes ont une date_vente ancienne). Utiliser uniquement DATE(v.created_at).
+$venteDateExpr = 'DATE(v.created_at)';
 
 $hasPayDate = columnExists($db, 'payments', 'date_payment');
 $payDateExpr = $hasPayDate ? 'COALESCE(date_payment, DATE(created_at))' : 'DATE(created_at)';

@@ -94,9 +94,11 @@ try {
         // Clients du dépôt (inchangé)
         $stats['total_clients'] = (int)$scalar("SELECT COUNT(*) FROM clients WHERE depot_id = ? AND is_active = 1", [$depotId]);
     } elseif ($userRole === 'comptable') {
-        // Chiffres d'affaires
-        $stats['revenue_today']   = (int)$scalar("SELECT COALESCE(SUM(montant_total),0) FROM ventes WHERE DATE(created_at) = CURDATE()");
-        $stats['revenue_month']   = (int)$scalar("SELECT COALESCE(SUM(montant_total),0) FROM ventes WHERE MONTH(created_at) = MONTH(CURDATE()) AND YEAR(created_at) = YEAR(CURDATE())");
+        // Pour des KPI cohérents avec vos saisies, baser les dates sur DATE(created_at)
+        $venteDateExpr = 'DATE(created_at)';
+        // Chiffres d'affaires (basés sur ventes créées)
+        $stats['revenue_today']   = (int)$scalar("SELECT COALESCE(SUM(montant_total),0) FROM ventes WHERE $venteDateExpr = CURDATE()");
+        $stats['revenue_month']   = (int)$scalar("SELECT COALESCE(SUM(montant_total),0) FROM ventes WHERE MONTH($venteDateExpr) = MONTH(CURDATE()) AND YEAR($venteDateExpr) = YEAR(CURDATE())");
         // Paiements (recalibrés pour refléter l'encours réel)
         // En attente = nombre de ventes avec solde dû (quel que soit l'état des enregistrements payments)
         $stats['pending_payments'] = (int)$scalar("SELECT COUNT(*) FROM ventes WHERE montant_paye < montant_total");
@@ -107,9 +109,11 @@ try {
         // Montants utiles pour le comptable (basés sur la date de paiement déclarée)
         $stats['received_today_amount'] = (int)$scalar("SELECT COALESCE(SUM(montant),0) FROM payments WHERE statut='valide' AND date_payment = CURDATE()");
         $stats['outstanding_total_amount'] = (int)$scalar("SELECT COALESCE(SUM(montant_total - montant_paye),0) FROM ventes WHERE montant_paye < montant_total");
-        $stats['outstanding_today_amount'] = (int)$scalar("SELECT COALESCE(SUM(montant_total - montant_paye),0) FROM ventes WHERE DATE(created_at)=CURDATE() AND montant_paye < montant_total");
-        // Factures du jour = ventes du jour
-        $stats['total_invoices']  = (int)$scalar("SELECT COUNT(*) FROM ventes WHERE DATE(created_at) = CURDATE()");
+        $stats['outstanding_today_amount'] = (int)$scalar("SELECT COALESCE(SUM(montant_total - montant_paye),0) FROM ventes WHERE $venteDateExpr = CURDATE() AND montant_paye < montant_total");
+        // Factures du jour = ventes créées aujourd'hui
+        $stats['total_invoices']  = (int)$scalar("SELECT COUNT(*) FROM ventes WHERE $venteDateExpr = CURDATE()");
+        // Factures de reliquat (auto) = ventes avec encours (toutes périodes)
+        $stats['reliquat_invoices'] = (int)$scalar("SELECT COUNT(*) FROM ventes WHERE montant_paye < montant_total");
     }
 } catch (Exception $e) {
     $stats = [];
@@ -448,6 +452,16 @@ include 'includes/header.php';
                 <div class="stat-info">
                     <h3><?= number_format($stats['total_invoices'] ?? 0) ?></h3>
                     <p>Factures Aujourd'hui</p>
+                </div>
+            </div>
+
+            <div class="stat-card secondary">
+                <div class="stat-icon">
+                    <i class="fas fa-file-invoice-dollar"></i>
+                </div>
+                <div class="stat-info">
+                    <h3><?= number_format($stats['reliquat_invoices'] ?? 0) ?></h3>
+                    <p>Factures Reliquat (Auto)</p>
                 </div>
             </div>
 

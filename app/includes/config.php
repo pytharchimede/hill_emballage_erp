@@ -202,9 +202,10 @@ function getMenuForRole($role)
         ],
         'comptable' => [
             'dashboard' => ['icon' => 'fas fa-tachometer-alt', 'title' => 'Tableau de bord', 'url' => BASE_URL . '/web_admin/comptable.php'],
-            'payments' => ['icon' => 'fas fa-credit-card', 'title' => 'Paiements', 'url' => BASE_URL . '/web_admin/payments.php'],
-            'reports' => ['icon' => 'fas fa-chart-bar', 'title' => 'Rapports', 'url' => BASE_URL . '/web_admin/reports.php'],
-            'credits' => ['icon' => 'fas fa-clock', 'title' => 'Crédits', 'url' => BASE_URL . '/web_admin/credits.php'],
+            'payments' => ['icon' => 'fas fa-credit-card', 'title' => 'Paiements', 'url' => BASE_URL . '/app/payments.php'],
+            'reports' => ['icon' => 'fas fa-chart-bar', 'title' => 'Rapports', 'url' => BASE_URL . '/app/reports.php'],
+            'credits' => ['icon' => 'fas fa-clock', 'title' => 'Crédits', 'url' => BASE_URL . '/app/credits.php'],
+            'invoices' => ['icon' => 'fas fa-file-invoice', 'title' => 'Factures', 'url' => BASE_URL . '/app/invoices.php'],
             'clients_view' => ['icon' => 'fas fa-users', 'title' => 'Clients', 'url' => BASE_URL . '/web_admin/clients.php'],
             'my_activity' => ['icon' => 'fas fa-user-clock', 'title' => 'Mon activité', 'url' => BASE_URL . '/web_admin/my-activity.php'],
             'profile' => ['icon' => 'fas fa-user-circle', 'title' => 'Mon profil', 'url' => BASE_URL . '/web_admin/profile.php'],
