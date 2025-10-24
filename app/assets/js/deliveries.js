@@ -20,6 +20,7 @@
   const dlSigSave = document.getElementById("dl_sig_save");
   const dlConfirm = document.getElementById("dl_confirm_btn");
   const dlPrint = document.getElementById("dl_print_btn");
+  const dlLocLink = document.getElementById("dl_loc_link");
 
   // Leaflet map globals
   let map = null;
@@ -149,6 +150,7 @@
         "fr-FR"
       );
     if (dlEntityId) dlEntityId.value = String(it.id);
+    if (dlLocLink) dlLocLink.dataset.id = String(it.id || "");
     // small map
     if (dlMapEl && window.L) {
       setTimeout(() => {
@@ -288,6 +290,36 @@
         w.print();
         setTimeout(() => w.close(), 200);
       } catch {}
+    });
+  }
+
+  if (dlLocLink) {
+    dlLocLink.addEventListener("click", async (e) => {
+      e.preventDefault();
+      const id = dlLocLink.dataset.id;
+      if (!id) return;
+      try {
+        const r = await fetch(
+          `${BASE}/app/ajax/location_link.php?id=${encodeURIComponent(id)}`,
+          { headers: { Accept: "application/json" } }
+        );
+        const j = await r.json();
+        if (!j.ok || !j.url) {
+          alert("Impossible de générer le lien.");
+          return;
+        }
+        const url = j.url;
+        // Copier dans le presse-papiers si possible
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(url);
+          alert("Lien copié dans le presse-papiers.");
+        } else {
+          // Fallback prompt
+          prompt("Copiez le lien:", url);
+        }
+      } catch (e) {
+        alert("Erreur réseau.");
+      }
     });
   }
 

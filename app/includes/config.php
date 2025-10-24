@@ -18,6 +18,11 @@ if (preg_match('#/(web_admin|app)$#', $baseUrl)) {
 define('BASE_URL', $baseUrl);
 define('ASSETS_URL', BASE_URL . '/app/assets');
 
+// Secret léger pour signer des liens de localisation (changez en PROD)
+if (!defined('LINK_SIGN_SECRET')) {
+    define('LINK_SIGN_SECRET', 'change-me-please');
+}
+
 // Inclusion robuste de la configuration base de données
 $dbConfigPath = realpath(ROOT_PATH . '/../backend/config/database.php');
 if ($dbConfigPath && file_exists($dbConfigPath)) {
@@ -178,10 +183,8 @@ function getMenuForRole($role)
         'livreur' => [
             'dashboard' => ['icon' => 'fas fa-tachometer-alt', 'title' => 'Tableau de bord', 'url' => BASE_URL . '/web_admin/livreur.php'],
             'deliveries' => ['icon' => 'fas fa-truck', 'title' => 'Livraisons', 'url' => BASE_URL . '/web_admin/deliveries.php'],
+            // Retiré à la demande: transfers, ajustements, entrées de stock
             'stock' => ['icon' => 'fas fa-warehouse', 'title' => 'Stock', 'url' => BASE_URL . '/web_admin/stock.php'],
-            'stock_entries' => ['icon' => 'fas fa-plus-square', 'title' => 'Entrées de stock', 'url' => BASE_URL . '/web_admin/stock_entries.php'],
-            'stock_adjustments' => ['icon' => 'fas fa-clipboard-check', 'title' => "Ajustements d'inventaire", 'url' => BASE_URL . '/web_admin/stock_adjustments.php'],
-            'transfers' => ['icon' => 'fas fa-exchange-alt', 'title' => 'Transferts', 'url' => BASE_URL . '/web_admin/transfers.php'],
             'my_activity' => ['icon' => 'fas fa-user-clock', 'title' => 'Mon activité', 'url' => BASE_URL . '/web_admin/my-activity.php'],
             'profile' => ['icon' => 'fas fa-user-circle', 'title' => 'Mon profil', 'url' => BASE_URL . '/web_admin/profile.php'],
         ],

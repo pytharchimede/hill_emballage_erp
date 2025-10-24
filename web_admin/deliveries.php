@@ -49,7 +49,9 @@ include __DIR__ . '/../app/includes/header.php';
                     <div class="col-md-6">
                         <div class="mb-2"><strong>Commande</strong>: <span id="dl_numero">-</span></div>
                         <div class="mb-2"><strong>Client</strong>: <span id="dl_client">-</span></div>
-                        <div class="mb-2"><strong>Adresse</strong>: <span id="dl_adresse">-</span></div>
+                        <div class="mb-2 d-flex align-items-center gap-2 flex-wrap">
+                            <div><strong>Adresse</strong>: <span id="dl_adresse">-</span></div><button class="btn btn-outline-secondary btn-sm" id="dl_loc_link" title="Copier un lien pour que le client partage sa position"><i class="fas fa-location-arrow"></i> Lien de localisation</button>
+                        </div>
                         <div class="mb-2"><strong>Montant</strong>: <span id="dl_montant">-</span> FCFA</div>
                         <div id="dl_map" style="height:240px;border-radius:10px;"></div>
                     </div>
