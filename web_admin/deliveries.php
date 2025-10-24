@@ -50,7 +50,10 @@ include __DIR__ . '/../app/includes/header.php';
                         <div class="mb-2"><strong>Commande</strong>: <span id="dl_numero">-</span></div>
                         <div class="mb-2"><strong>Client</strong>: <span id="dl_client">-</span></div>
                         <div class="mb-2 d-flex align-items-center gap-2 flex-wrap">
-                            <div><strong>Adresse</strong>: <span id="dl_adresse">-</span></div><button class="btn btn-outline-secondary btn-sm" id="dl_loc_link" title="Copier un lien pour que le client partage sa position"><i class="fas fa-location-arrow"></i> Lien de localisation</button>
+                            <div><strong>Adresse</strong>: <span id="dl_adresse">-</span></div>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" id="dl_loc_link" title="Copier un lien pour que le client partage sa position"><i class="fas fa-location-arrow"></i> Lien de localisation</button>
+                            <a class="btn btn-outline-success btn-sm disabled" id="dl_loc_whatsapp" href="#" target="_blank" rel="noopener" aria-disabled="true" title="Partager via WhatsApp"><i class="fab fa-whatsapp"></i></a>
+                            <a class="btn btn-outline-primary btn-sm disabled" id="dl_loc_sms" href="#" target="_blank" rel="noopener" aria-disabled="true" title="Partager par SMS"><i class="fas fa-sms"></i></a>
                         </div>
                         <div class="mb-2"><strong>Montant</strong>: <span id="dl_montant">-</span> FCFA</div>
                         <div id="dl_map" style="height:240px;border-radius:10px;"></div>
@@ -94,6 +97,7 @@ include __DIR__ . '/../app/includes/header.php';
 </div>
 
 <!-- Leaflet + SignaturePad + JS page -->
+<link rel="stylesheet" href="<?= ASSETS_URL ?>/css/toast.css" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" crossorigin="anonymous" />
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.1.7/dist/signature_pad.umd.min.js" crossorigin="anonymous"></script>

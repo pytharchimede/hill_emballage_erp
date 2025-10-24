@@ -355,16 +355,16 @@ include 'includes/header.php';
             <div class="widget">
                 <h3><i class="fas fa-route"></i> Actions Rapides</h3>
                 <div class="quick-actions">
-                    <a href="deliveries.php?status=pending" class="action-btn warning">
+                    <a href="<?= BASE_URL ?>/web_admin/deliveries.php?status=pending" class="action-btn warning">
                         <i class="fas fa-truck-loading"></i> Livraisons en Attente
                     </a>
-                    <a href="deliveries.php?action=new" class="action-btn success">
+                    <a href="<?= BASE_URL ?>/web_admin/deliveries.php?action=new" class="action-btn success">
                         <i class="fas fa-plus-circle"></i> Nouvelle Livraison
                     </a>
-                    <a href="deliveries.php" class="action-btn primary">
+                    <a href="<?= BASE_URL ?>/web_admin/deliveries.php" class="action-btn primary">
                         <i class="fas fa-list"></i> Toutes les Livraisons
                     </a>
-                    <a href="clients.php" class="action-btn info">
+                    <a href="<?= BASE_URL ?>/web_admin/clients.php" class="action-btn info">
                         <i class="fas fa-map-marked-alt"></i> Localiser Clients
                     </a>
                 </div>

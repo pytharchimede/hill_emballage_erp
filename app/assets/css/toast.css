@@ -1,0 +1,5 @@
+.app-toast{position:fixed;right:16px;bottom:16px;z-index:1055;min-width:220px;max-width:70vw;background:#333;color:#fff;padding:10px 14px;border-radius:8px;opacity:0;transform:translateY(8px);transition:opacity .2s ease, transform .2s ease;box-shadow:0 6px 20px rgba(0,0,0,.2)}
+.app-toast.show{opacity:1;transform:translateY(0)}
+.app-toast.success{background:#28a745}
+.app-toast.error{background:#dc3545}
+.app-toast.info{background:#0d6efd}

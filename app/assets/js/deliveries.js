@@ -21,6 +21,32 @@
   const dlConfirm = document.getElementById("dl_confirm_btn");
   const dlPrint = document.getElementById("dl_print_btn");
   const dlLocLink = document.getElementById("dl_loc_link");
+  const dlLocWhatsApp = document.getElementById("dl_loc_whatsapp");
+  const dlLocSMS = document.getElementById("dl_loc_sms");
+
+  // Toast léger
+  function showToast(message, kind = "info") {
+    let t = document.getElementById("app_toast");
+    if (!t) {
+      t = document.createElement("div");
+      t.id = "app_toast";
+      t.className = "app-toast d-none";
+      const s = document.createElement("span");
+      s.id = "app_toast_text";
+      t.appendChild(s);
+      document.body.appendChild(t);
+    }
+    t.classList.remove("d-none", "success", "error", "info");
+    t.classList.add(kind);
+    const span = t.querySelector("#app_toast_text");
+    if (span) span.textContent = message;
+    setTimeout(() => {
+      t.classList.add("show");
+    }, 10);
+    setTimeout(() => {
+      t.classList.remove("show");
+    }, 2800);
+  }
 
   // Leaflet map globals
   let map = null;
@@ -151,6 +177,16 @@
       );
     if (dlEntityId) dlEntityId.value = String(it.id);
     if (dlLocLink) dlLocLink.dataset.id = String(it.id || "");
+    if (dlLocWhatsApp) {
+      dlLocWhatsApp.href = "#";
+      dlLocWhatsApp.classList.add("disabled");
+      dlLocWhatsApp.setAttribute("aria-disabled", "true");
+    }
+    if (dlLocSMS) {
+      dlLocSMS.href = "#";
+      dlLocSMS.classList.add("disabled");
+      dlLocSMS.setAttribute("aria-disabled", "true");
+    }
     // small map
     if (dlMapEl && window.L) {
       setTimeout(() => {
@@ -211,7 +247,7 @@
       e.preventDefault();
       try {
         if (!sigPad || sigPad.isEmpty()) {
-          alert("Veuillez signer.");
+          showToast("Veuillez signer.", "error");
           return;
         }
         const id = dlEntityId?.value;
@@ -232,12 +268,12 @@
         });
         const j = await resp.json();
         if (!j.ok) {
-          alert("Échec de sauvegarde de la signature.");
+          showToast("Échec de sauvegarde de la signature.", "error");
           return;
         }
-        alert("Signature enregistrée.");
+        showToast("Signature enregistrée.", "success");
       } catch (e) {
-        alert("Erreur pendant la sauvegarde.");
+        showToast("Erreur pendant la sauvegarde.", "error");
       }
     });
   }
@@ -255,14 +291,14 @@
         });
         const j = await r.json();
         if (!j.ok) {
-          alert("Échec de confirmation.");
+          showToast("Échec de confirmation.", "error");
           return;
         }
         if (modal && modal.hide) modal.hide();
         loadData();
-        alert("Livraison confirmée.");
+        showToast("Livraison confirmée.", "success");
       } catch (e) {
-        alert("Erreur de confirmation.");
+        showToast("Erreur de confirmation.", "error");
       }
     });
   }
@@ -301,24 +337,43 @@
       try {
         const r = await fetch(
           `${BASE}/app/ajax/location_link.php?id=${encodeURIComponent(id)}`,
-          { headers: { Accept: "application/json" } }
+          {
+            headers: { Accept: "application/json" },
+            credentials: "same-origin",
+          }
         );
         const j = await r.json();
         if (!j.ok || !j.url) {
-          alert("Impossible de générer le lien.");
+          showToast("Impossible de générer le lien.", "error");
           return;
         }
         const url = j.url;
         // Copier dans le presse-papiers si possible
         if (navigator.clipboard && navigator.clipboard.writeText) {
           await navigator.clipboard.writeText(url);
-          alert("Lien copié dans le presse-papiers.");
+          showToast("Lien copié dans le presse-papiers.", "success");
         } else {
           // Fallback prompt
+          showToast("Copiez le lien affiché…", "info");
           prompt("Copiez le lien:", url);
         }
+        const message = `Bonjour, voici le lien pour partager votre position pour la livraison ${
+          dlNumero?.textContent || ""
+        } : ${url}`;
+        if (dlLocWhatsApp) {
+          dlLocWhatsApp.href = `https://wa.me/?text=${encodeURIComponent(
+            message
+          )}`;
+          dlLocWhatsApp.classList.remove("disabled");
+          dlLocWhatsApp.removeAttribute("aria-disabled");
+        }
+        if (dlLocSMS) {
+          dlLocSMS.href = `sms:?&body=${encodeURIComponent(message)}`;
+          dlLocSMS.classList.remove("disabled");
+          dlLocSMS.removeAttribute("aria-disabled");
+        }
       } catch (e) {
-        alert("Erreur réseau.");
+        showToast("Erreur réseau.", "error");
       }
     });
   }
