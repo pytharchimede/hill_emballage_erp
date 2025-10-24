@@ -8,15 +8,27 @@ session_start();
 
 // Définir des chemins/URLs de base pour réutilisation entre app/ et web_admin/
 define('ROOT_PATH', realpath(__DIR__ . '/..')); // c:\wamp\www\hill\app
-// Détecter la base URL (ex: /hill)
+// Détecter la base URL (ex: /hill). On veut la racine du projet web (parent de /app et /web_admin)
 $scriptName = $_SERVER['SCRIPT_NAME'] ?? '';
-$baseUrl = rtrim(str_replace(['\\'], '/', dirname($scriptName)), '/');
-// Si on est sous /web_admin ou /app, remonter à la racine projet web (/hill)
-if (preg_match('#/(web_admin|app)$#', $baseUrl)) {
-    $baseUrl = substr($baseUrl, 0, strrpos($baseUrl, '/')) ?: '';
+$scriptName = str_replace('\\', '/', $scriptName);
+$scriptDir  = rtrim(str_replace('\\', '/', dirname($scriptName)), '/');
+if (preg_match('#^(.*?)/(web_admin|app)(?:/|$)#', $scriptName, $m)) {
+    $baseUrl = rtrim($m[1], '/'); // ex: '', '/hill'
+} else {
+    $baseUrl = $scriptDir === '/' ? '' : $scriptDir;
 }
 define('BASE_URL', $baseUrl);
 define('ASSETS_URL', BASE_URL . '/app/assets');
+
+// URL absolue (schéma + host) pour les liens partageables (WhatsApp/SMS, emails, etc.)
+// Détecte aussi les en-têtes de reverse proxy courants.
+$forwardedProto = $_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '';
+$https = (!empty($_SERVER['HTTPS']) && strtolower($_SERVER['HTTPS']) !== 'off') || $forwardedProto === 'https';
+$scheme = $https ? 'https' : 'http';
+$host = $_SERVER['HTTP_X_FORWARDED_HOST'] ?? ($_SERVER['HTTP_HOST'] ?? 'localhost');
+// Construire l'URL absolue du site (ex: https://app.hillemballage.ci[/base])
+define('ORIGIN_URL', $scheme . '://' . $host);
+define('SITE_URL', rtrim(ORIGIN_URL . BASE_URL, '/'));
 
 // Secret léger pour signer des liens de localisation (changez en PROD)
 if (!defined('LINK_SIGN_SECRET')) {

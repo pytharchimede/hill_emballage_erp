@@ -30,5 +30,5 @@ try {
 } catch (Exception $e) { /* ignore */
 }
 $sig = hash_hmac('sha256', (string)$id, LINK_SIGN_SECRET);
-$url = BASE_URL . '/app/public/client_locate.php?vente=' . $id . '&sig=' . $sig;
+$url = SITE_URL . '/app/public/client_locate.php?vente=' . $id . '&sig=' . $sig;
 echo json_encode(['ok' => true, 'url' => $url]);
