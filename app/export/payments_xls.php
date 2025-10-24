@@ -40,8 +40,24 @@ if ($d2) {
     $params[] = $d2;
 }
 
+$isVendor = (($_SESSION['user_role'] ?? '') === 'vendeur');
+if ($isVendor) {
+    // Restreindre aux données du dépôt du vendeur, en suivant la même priorité que les pages Ventes
+    $current = getCurrentUser();
+    $depotId = (int)($current['depot_id'] ?? 0);
+    // Joindre utilisateurs pour remonter le dépôt via user/livreur si besoin
+    $where .= ' AND (v.depot_id = ? OR (v.livreur_id IS NOT NULL AND lvr.depot_id = ?) OR (v.user_id IS NOT NULL AND uu.depot_id = ?) OR c.depot_id = ?)';
+    array_push($params, $depotId, $depotId, $depotId, $depotId);
+}
+
 $sql = "SELECT p.numero_recu, p.date_payment, v.numero_vente, c.nom as client_nom, p.montant, p.mode_payment, p.statut
-        FROM payments p JOIN ventes v ON p.vente_id=v.id JOIN clients c ON v.client_id=c.id $where ORDER BY p.created_at DESC";
+    FROM payments p 
+    JOIN ventes v ON p.vente_id=v.id 
+    JOIN clients c ON v.client_id=c.id 
+    LEFT JOIN users uu ON v.user_id = uu.id 
+    LEFT JOIN users lvr ON v.livreur_id = lvr.id 
+    $where 
+    ORDER BY p.created_at DESC";
 $st = $db->prepare($sql);
 $st->execute($params);
 $rows = $st->fetchAll(PDO::FETCH_ASSOC);
