@@ -27,6 +27,13 @@ function colExistsSales(PDO $db, $table, $column)
 // Create / Update / Delete sale
 $msg = '';
 $msgType = '';
+// Colonnes optionnelles pour la livraison
+$hasDeliveryMode = colExistsSales($db, 'ventes', 'delivery_mode');
+$hasLivreurId = colExistsSales($db, 'ventes', 'livreur_id');
+$hasDeliveryAddress = colExistsSales($db, 'ventes', 'delivery_address');
+$hasDeliveryLat = colExistsSales($db, 'ventes', 'delivery_latitude');
+$hasDeliveryLng = colExistsSales($db, 'ventes', 'delivery_longitude');
+$hasDeliveryDetails = colExistsSales($db, 'ventes', 'delivery_details');
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
     try {
@@ -38,6 +45,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $date_echeance = $_POST['date_echeance'] ?: null;
             $commentaire = trim($_POST['commentaire'] ?? '');
             $items = $_POST['items'] ?? [];
+            // Mode de vente & livraison
+            $mode_vente = $_POST['mode_vente'] ?? 'sur_place';
+            $livreur_id = $hasLivreurId ? (int)($_POST['livreur_id'] ?? 0) : 0;
+            $del_addr = $hasDeliveryAddress ? trim($_POST['delivery_address'] ?? '') : '';
+            $del_lat = $hasDeliveryLat && $_POST['delivery_latitude'] !== '' ? (float)$_POST['delivery_latitude'] : null;
+            $del_lng = $hasDeliveryLng && $_POST['delivery_longitude'] !== '' ? (float)$_POST['delivery_longitude'] : null;
+            $del_details = $hasDeliveryDetails ? trim($_POST['delivery_details'] ?? '') : '';
 
             if ($client_id <= 0 || empty($items)) {
                 throw new Exception("Client ou articles manquants");
@@ -54,12 +68,60 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 throw new Exception("Montant total invalide");
             }
 
+            // Validation livraison
+            if ($mode_vente === 'livraison') {
+                if ($hasLivreurId && $livreur_id <= 0) {
+                    throw new Exception("Veuillez choisir un livreur pour la livraison.");
+                }
+                if ($hasDeliveryAddress && $hasDeliveryLat && $hasDeliveryLng) {
+                    if ($del_addr !== '' && ($del_lat === null || $del_lng === null)) {
+                        throw new Exception("Veuillez sélectionner l'adresse de livraison dans la liste (coordonnées manquantes).");
+                    }
+                }
+            }
+
             // numero_vente
             $numero = 'V-' . date('Ymd-His') . '-' . substr(bin2hex(random_bytes(2)), 0, 4);
 
             $db->beginTransaction();
-            $st = $db->prepare("INSERT INTO ventes (client_id, user_id, numero_vente, date_vente, type_vente, montant_total, montant_paye, statut, date_echeance, commentaire) VALUES (?,?,?,?,?,?,0,'en_attente',?,?)");
-            $st->execute([$client_id, $_SESSION['user_id'], $numero, $date_vente, $type_vente, $total, $date_echeance, $commentaire]);
+            // Construction dynamique des colonnes pour intégrer la livraison si dispo
+            $cols = ['client_id', 'user_id', 'numero_vente', 'date_vente', 'type_vente', 'montant_total', 'montant_paye', 'statut'];
+            $vals = [$client_id, $_SESSION['user_id'], $numero, $date_vente, $type_vente, $total, 0, 'en_attente'];
+            if (!empty($date_echeance)) {
+                $cols[] = 'date_echeance';
+                $vals[] = $date_echeance;
+            }
+            $cols[] = 'commentaire';
+            $vals[] = $commentaire;
+            if ($hasDeliveryMode) {
+                $cols[] = 'delivery_mode';
+                $vals[] = $mode_vente;
+            }
+            if ($mode_vente === 'livraison') {
+                if ($hasLivreurId) {
+                    $cols[] = 'livreur_id';
+                    $vals[] = $livreur_id ?: null;
+                }
+                if ($hasDeliveryAddress) {
+                    $cols[] = 'delivery_address';
+                    $vals[] = $del_addr ?: null;
+                }
+                if ($hasDeliveryLat) {
+                    $cols[] = 'delivery_latitude';
+                    $vals[] = $del_lat;
+                }
+                if ($hasDeliveryLng) {
+                    $cols[] = 'delivery_longitude';
+                    $vals[] = $del_lng;
+                }
+                if ($hasDeliveryDetails) {
+                    $cols[] = 'delivery_details';
+                    $vals[] = $del_details ?: null;
+                }
+            }
+            $sql = "INSERT INTO ventes (" . implode(',', $cols) . ") VALUES (" . rtrim(str_repeat('?,', count($cols)), ',') . ")";
+            $st = $db->prepare($sql);
+            $st->execute($vals);
             $vente_id = (int)$db->lastInsertId();
 
             $sti = $db->prepare("INSERT INTO vente_items (vente_id, produit_id, nom_produit, quantite, prix_unitaire, montant) VALUES (?,?,?,?,?,?)");
@@ -159,6 +221,33 @@ $pages = max(1, (int)ceil($total / $limit));
 // Data for forms
 $clients = $db->query("SELECT id, COALESCE(CONCAT(nom, ' ', IFNULL(prenom,'')), nom) as label FROM clients WHERE is_active=1 ORDER BY nom")->fetchAll(PDO::FETCH_ASSOC);
 $products = $db->query("SELECT id, nom, prix_unitaire, prix_credit FROM products WHERE is_active=1 ORDER BY nom")->fetchAll(PDO::FETCH_ASSOC);
+
+// Préparer liste des livreurs (priorité: même dépôt que le vendeur si disponible)
+$livreurs = [];
+try {
+    $roleCol = colExistsSales($db, 'users', 'role') ? 'role' : (colExistsSales($db, 'users', 'user_role') ? 'user_role' : null);
+    $hasUserActive = colExistsSales($db, 'users', 'is_active');
+    $hasUserDepot = colExistsSales($db, 'users', 'depot_id');
+    $depotSeller = null;
+    if ($hasUserDepot) {
+        $s = $db->prepare("SELECT depot_id FROM users WHERE id=?");
+        $s->execute([$_SESSION['user_id']]);
+        $depotSeller = (int)($s->fetch(PDO::FETCH_ASSOC)['depot_id'] ?? 0) ?: null;
+    }
+    if ($roleCol) {
+        if ($depotSeller && $hasUserDepot) {
+            $sqlL = "SELECT id, full_name FROM users WHERE $roleCol='livreur'" . ($hasUserActive ? " AND is_active=1" : "") . " ORDER BY (depot_id=? ) DESC, full_name";
+            $stL = $db->prepare($sqlL);
+            $stL->execute([$depotSeller]);
+            $livreurs = $stL->fetchAll(PDO::FETCH_ASSOC);
+        } else {
+            $sqlL = "SELECT id, full_name FROM users WHERE $roleCol='livreur'" . ($hasUserActive ? " AND is_active=1" : "") . " ORDER BY full_name";
+            $livreurs = $db->query($sqlL)->fetchAll(PDO::FETCH_ASSOC);
+        }
+    }
+} catch (Exception $e) {
+    $livreurs = [];
+}
 
 $pageTitle = 'Ventes';
 log_action('VIEW', 'ventes');
@@ -300,12 +389,56 @@ include 'includes/header.php';
                                 </select>
                             </div>
                             <div class="col-md-3">
+                                <label class="form-label">Mode</label>
+                                <select class="form-select" name="mode_vente" id="mode_vente">
+                                    <option value="sur_place">Sur place</option>
+                                    <option value="livraison">À la livraison</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
                                 <label class="form-label">Échéance (si crédit)</label>
                                 <input class="form-control" type="date" name="date_echeance" />
                             </div>
                         </div>
 
                         <hr />
+                        <div id="delivery_section" style="display:none;">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">Livreur</label>
+                                    <select class="form-select" name="livreur_id" id="livreur_id" <?= $hasLivreurId ? '' : 'disabled' ?>>
+                                        <option value="">-- choisir --</option>
+                                        <?php foreach ($livreurs as $lv): ?>
+                                            <option value="<?= (int)$lv['id'] ?>"><?= htmlspecialchars($lv['full_name']) ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                    <?php if (!$hasLivreurId): ?><div class="small text-warning">Colonne livreur_id manquante (migration requise).</div><?php endif; ?>
+                                </div>
+                                <div class="col-md-6 position-relative">
+                                    <label class="form-label">Adresse de livraison</label>
+                                    <div class="input-group">
+                                        <input class="form-control" name="delivery_address" id="delivery_adresse" autocomplete="off" placeholder="Tapez une adresse précise" <?= $hasDeliveryAddress ? '' : 'disabled' ?> />
+                                        <button class="btn btn-outline-secondary" type="button" id="delivery_locate_btn" title="Ma position"><i class="fas fa-location-crosshairs"></i></button>
+                                    </div>
+                                    <div id="delivery_suggestions" class="list-group" style="position:absolute; z-index:1080; width:100%; max-height:220px; overflow:auto; display:none;"></div>
+                                </div>
+                                <?php if ($hasDeliveryLat && $hasDeliveryLng): ?>
+                                    <input type="hidden" name="delivery_latitude" id="delivery_latitude" />
+                                    <input type="hidden" name="delivery_longitude" id="delivery_longitude" />
+                                    <div class="col-12">
+                                        <div id="delivery_map" style="width:100%; height:260px; border-radius:10px; box-shadow:0 2px 8px rgba(0,0,0,.08);"></div>
+                                    </div>
+                                <?php endif; ?>
+                                <div class="col-12">
+                                    <label class="form-label">Détails de livraison</label>
+                                    <textarea class="form-control" name="delivery_details" id="delivery_details" rows="2" <?= $hasDeliveryDetails ? '' : 'disabled' ?>></textarea>
+                                </div>
+                                <?php if (!$hasDeliveryAddress || !$hasDeliveryLat || !$hasDeliveryLng || !$hasDeliveryDetails || !$hasDeliveryMode): ?>
+                                    <div class="col-12 small text-info">Pour activer pleinement la livraison, exécutez la migration: <a href="<?= BASE_URL ?>/migrations/alter_ventes_add_delivery.php" target="_blank">ajouter les colonnes livraison</a>.</div>
+                                <?php endif; ?>
+                            </div>
+                            <hr />
+                        </div>
                         <div>
                             <table class="table" id="itemsTable">
                                 <thead>
@@ -341,6 +474,10 @@ include 'includes/header.php';
         <?= json_encode($products, JSON_UNESCAPED_UNICODE) ?>
     </script>
     <script src="<?= ASSETS_URL ?>/js/sales.js"></script>
+    <!-- Livraison: Leaflet + géocodage -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" crossorigin="anonymous" />
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js" crossorigin="anonymous"></script>
+    <script src="<?= ASSETS_URL ?>/js/sales_delivery.js"></script>
 <?php endif; ?>
 
 <?php include 'includes/footer.php'; ?>
