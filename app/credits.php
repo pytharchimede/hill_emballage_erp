@@ -22,14 +22,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $mode = $_POST['mode_payment'] ?? 'espece';
             $ref = trim($_POST['reference'] ?? '');
             if ($vente_id <= 0 || $montant <= 0) throw new Exception('Vente ou montant invalide');
-            $numero = 'RC-' . date('Ymd-His') . '-' . substr(bin2hex(random_bytes(2)), 0, 4);
-            $st = $db->prepare("INSERT INTO payments (vente_id, numero_recu, date_payment, montant, mode_payment, statut, reference) VALUES (?,?,?,?,?,'valide',?)");
-            $st->execute([$vente_id, $numero, $date_payment, $montant, $mode, $ref]);
-            $db->prepare("UPDATE ventes SET montant_paye = montant_paye + ? WHERE id=?")->execute([$montant, $vente_id]);
-            $db->prepare("UPDATE ventes SET statut = CASE WHEN montant_paye >= montant_total THEN 'validee' ELSE statut END WHERE id=?")->execute([$vente_id]);
-            log_action('CREATE', 'payments', (int)$db->lastInsertId(), ['vente_id' => $vente_id, 'montant' => $montant, 'mode' => $mode]);
-            $msg = 'Paiement enregistré';
-            $msgType = 'success';
+
+            // Valider le restant dû de la vente et plafonner le paiement
+            $stChk = $db->prepare("SELECT montant_total, montant_paye FROM ventes WHERE id=?");
+            $stChk->execute([$vente_id]);
+            $vente = $stChk->fetch(PDO::FETCH_ASSOC);
+            if (!$vente) throw new Exception("Vente introuvable");
+            $restant = (float)$vente['montant_total'] - (float)$vente['montant_paye'];
+            if ($restant <= 0) throw new Exception("Cette vente est déjà soldée");
+            if ($montant > $restant) throw new Exception("Le montant saisi dépasse le restant dû (" . number_format($restant, 0, ',', ' ') . " FCFA)");
+
+            // Début transaction
+            $db->beginTransaction();
+            try {
+                $numero = 'RC-' . date('Ymd-His') . '-' . substr(bin2hex(random_bytes(2)), 0, 4);
+                $st = $db->prepare("INSERT INTO payments (vente_id, numero_recu, date_payment, montant, mode_payment, statut, reference) VALUES (?,?,?,?,?,'valide',?)");
+                $st->execute([$vente_id, $numero, $date_payment, $montant, $mode, $ref]);
+
+                // Mettre à jour la vente
+                $db->prepare("UPDATE ventes SET montant_paye = montant_paye + ? WHERE id=?")->execute([$montant, $vente_id]);
+                $db->prepare("UPDATE ventes SET statut = CASE WHEN montant_paye >= montant_total THEN 'validee' ELSE statut END WHERE id=?")->execute([$vente_id]);
+
+                $db->commit();
+                log_action('CREATE', 'payments', (int)$db->lastInsertId(), ['vente_id' => $vente_id, 'montant' => $montant, 'mode' => $mode]);
+                $msg = 'Paiement enregistré';
+                $msgType = 'success';
+            } catch (Exception $txe) {
+                $db->rollBack();
+                throw $txe;
+            }
         }
     } catch (Exception $e) {
         $msg = 'Erreur: ' . $e->getMessage();
@@ -129,7 +150,12 @@ include 'includes/header.php';
                     <td class="text-end"><?= number_format(max(0, $r['restant']), 0, ',', ' ') ?></td>
                     <td>
                         <?php if (hasPermission('payments_create')): ?>
-                            <button class="btn btn-sm btn-primary" onclick="openPayModal(<?= (int)$r['id'] ?>, '<?= htmlspecialchars($r['numero_vente'], ENT_QUOTES) ?>', <?= (int)max(0, $r['restant']) ?>)"><i class="fas fa-plus"></i> Encaisser</button>
+                            <button class="btn btn-sm btn-primary btn-encaisser"
+                                data-vente-id="<?= (int)$r['id'] ?>"
+                                data-numero="<?= htmlspecialchars($r['numero_vente'], ENT_QUOTES) ?>"
+                                data-restant="<?= (int)max(0, $r['restant']) ?>">
+                                <i class="fas fa-plus"></i> Encaisser
+                            </button>
                         <?php endif; ?>
                     </td>
                 </tr>
@@ -178,15 +204,7 @@ include 'includes/header.php';
             </div>
         </div>
     </div>
-    <script>
-        function openPayModal(venteId, numero, restant) {
-            document.getElementById('pm_vente_id').value = venteId;
-            document.getElementById('pm_invoice').textContent = numero + ' — Reste ' + new Intl.NumberFormat('fr-FR').format(restant) + ' FCFA';
-            document.getElementById('pm_montant').value = restant;
-            const el = document.getElementById('payModal');
-            if (window.bootstrap && window.bootstrap.Modal) new bootstrap.Modal(el).show();
-        }
-    </script>
+    <script src="<?= ASSETS_URL ?>/js/credits.js" defer></script>
 <?php endif; ?>
 
 <?php include 'includes/footer.php'; ?>
