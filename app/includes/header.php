@@ -15,6 +15,9 @@
 
     <!-- CSS personnalisé -->
     <link rel="stylesheet" href="<?= ASSETS_URL ?>/css/app.css">
+    <link rel="stylesheet" href="<?= ASSETS_URL ?>/css/toast.css">
+
+    <script src="<?= ASSETS_URL ?>/js/toast.js" defer></script>
 
 
 

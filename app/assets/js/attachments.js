@@ -57,5 +57,26 @@
         // noop
       }
     });
+
+    // Copier lien pièce jointe
+    listEl.addEventListener("click", async function (e) {
+      const copyBtn =
+        e.target.closest && e.target.closest("[data-copy-attachment]");
+      if (!copyBtn) return;
+      const url = copyBtn.getAttribute("data-copy-attachment");
+      if (!url) return;
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(url);
+          if (window.showToast) window.showToast("Lien copié", "success");
+        } else {
+          if (window.showToast)
+            window.showToast("Copiez le lien affiché…", "info");
+          prompt("Copiez le lien:", url);
+        }
+      } catch (err) {
+        if (window.showToast) window.showToast("Impossible de copier", "error");
+      }
+    });
   }
 })();

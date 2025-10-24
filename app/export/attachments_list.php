@@ -20,10 +20,17 @@ if (!$rows) {
 }
 echo '<ul class="list-group">';
 foreach ($rows as $r) {
+    $url = (string)$r['path'];
+    $fileName = basename(parse_url($url, PHP_URL_PATH));
+    $copyBtn = '<button class="btn btn-outline-secondary btn-sm" data-copy-attachment="' . htmlspecialchars($url, ENT_QUOTES, 'UTF-8') . '" title="Copier le lien"><i class="fas fa-copy"></i></button>';
+    $delBtn = (hasPermission($entity === 'ventes' ? 'sales_update' : ($entity === 'payments' ? 'payments_update' : 'write')) ? '<button class="btn btn-danger btn-sm" data-delete-attachment="' . (int)$r['id'] . '"><i class="fas fa-trash"></i></button>' : '');
     echo '<li class="list-group-item d-flex justify-content-between align-items-center">'
-        . '<a href="' . htmlspecialchars($r['path']) . '" target="_blank">' . basename(parse_url($r['path'], PHP_URL_PATH)) . '</a>'
+        . '<div class="d-flex align-items-center gap-2">'
+        . $copyBtn
+        . '<a href="' . htmlspecialchars($url) . '" target="_blank">' . htmlspecialchars($fileName) . '</a>'
+        . '</div>'
         . '<span class="small">par ' . htmlspecialchars($r['full_name'] ?? '') . '</span>'
-        . (hasPermission($entity === 'ventes' ? 'sales_update' : ($entity === 'payments' ? 'payments_update' : 'write')) ? '<button class="btn btn-danger btn-sm" data-delete-attachment="' . (int)$r['id'] . '"><i class="fas fa-trash"></i></button>' : '')
+        . $delBtn
         . '</li>';
 }
 echo '</ul>';
