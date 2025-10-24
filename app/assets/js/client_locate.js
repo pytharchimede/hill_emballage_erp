@@ -13,6 +13,12 @@
   const $status = window.jQuery ? jQuery("#status") : null;
   const $ok = window.jQuery ? jQuery("#ok") : null;
   const $err = window.jQuery ? jQuery("#err") : null;
+  const mapBlock = document.getElementById("mapBlock");
+  const btnConfirm = document.getElementById("btnConfirm");
+  const addrInput = document.getElementById("addr");
+  let map = null,
+    marker = null;
+  let current = { lat: null, lon: null };
 
   function setText($el, text) {
     if ($el) {
@@ -37,6 +43,7 @@
       form.append("sig", sig);
       form.append("lat", String(lat));
       form.append("lon", String(lon));
+      if (addrInput && addrInput.value) form.append("addr", addrInput.value);
       const resp = await fetch(baseUrl + "app/api/client_location_submit.php", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -59,6 +66,35 @@
     }
   }
 
+  function ensureMap(lat, lon) {
+    if (!window.L) return;
+    if (!map) {
+      map = L.map("cl_map");
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: "&copy; OpenStreetMap",
+      }).addTo(map);
+    }
+    if (!marker) {
+      marker = L.marker([lat, lon], { draggable: true }).addTo(map);
+      marker.on("dragend", function () {
+        const p = marker.getLatLng();
+        current.lat = p.lat;
+        current.lon = p.lng;
+        setText(
+          $status,
+          "Point ajusté: " + p.lat.toFixed(5) + ", " + p.lng.toFixed(5)
+        );
+      });
+    } else {
+      marker.setLatLng([lat, lon]);
+    }
+    map.setView([lat, lon], 16);
+    current.lat = lat;
+    current.lon = lon;
+    if (mapBlock) mapBlock.classList.remove("d-none");
+  }
+
   function onClick() {
     hide($err);
     hide($ok);
@@ -74,8 +110,11 @@
     navigator.geolocation.getCurrentPosition(
       function (pos) {
         const { latitude, longitude } = pos.coords;
-        setText($status, "Position obtenue, envoi…");
-        sendPosition(latitude, longitude);
+        setText(
+          $status,
+          "Position obtenue. Vous pouvez ajuster le point si besoin."
+        );
+        ensureMap(latitude, longitude);
       },
       function (error) {
         let msg = "Impossible d'obtenir votre position.";
@@ -89,4 +128,14 @@
   }
 
   document.getElementById("btnShare")?.addEventListener("click", onClick);
+  btnConfirm?.addEventListener("click", function () {
+    hide($err);
+    hide($ok);
+    if (current.lat == null || current.lon == null) {
+      setText($status, "Veuillez d'abord activer votre position.");
+      return;
+    }
+    setText($status, "Envoi en cours…");
+    sendPosition(current.lat, current.lon);
+  });
 })();
