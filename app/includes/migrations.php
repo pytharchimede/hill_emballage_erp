@@ -117,3 +117,18 @@ function ensureLivreurFlowTables(PDO $db)
     } catch (Exception $e) {
     }
 }
+
+/**
+ * Ajoute la colonne d'affectation livreur aux clients si absente
+ */
+function ensureClientsLivreurColumn(PDO $db)
+{
+    try {
+        $hasCol = $db->query("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME='clients' AND COLUMN_NAME='livreur_id'")->fetchColumn();
+        if ((int)$hasCol === 0) {
+            $db->exec("ALTER TABLE clients ADD COLUMN livreur_id INT NULL AFTER created_by, ADD INDEX idx_client_livreur (livreur_id)");
+        }
+    } catch (Exception $e) {
+        // silencieux
+    }
+}

@@ -1,5 +1,6 @@
 <?php
 require_once 'includes/config.php';
+require_once 'includes/migrations.php';
 
 // Vérifier la connexion
 if (!isLoggedIn()) {
@@ -15,6 +16,9 @@ if (!hasPermission('clients_read')) {
 
 $userRole = $_SESSION['user_role'];
 $depotId = $_SESSION['depot_id'];
+
+// S'assurer que la colonne d'affectation existe
+ensureClientsLivreurColumn($db);
 
 // Helpers de compatibilité de schéma
 function columnExists(PDO $db, $table, $column)
@@ -47,20 +51,50 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $company = trim($_POST['company'] ?? '');
             $client_type = $_POST['client_type'] ?? 'particulier';
 
+            // Affectation au livreur: par défaut, si le créateur est un livreur, lier au créateur
+            $livreurAssign = null;
+            $creatorRole = $_SESSION['user_role'] ?? '';
+            if (in_array($creatorRole, ['livreur', 'commercial'], true)) {
+                $livreurAssign = (int)($_SESSION['user_id'] ?? 0) ?: null;
+            } else {
+                // Autoriser l'admin ou vendeur à choisir un livreur depuis le formulaire
+                if (isset($_POST['livreur_id']) && $_POST['livreur_id'] !== '') {
+                    $livreurAssign = (int)$_POST['livreur_id'];
+                }
+            }
+
             if (columnExists($db, 'clients', 'code_client')) {
                 // Schéma backend/migrations (clients avancés)
                 $code = 'CLT-' . strtoupper(dechex(time()));
-                $sql = "INSERT INTO clients (code_client, nom, prenoms, telephone, email, adresse, zone, type_client, credit_limite, solde_credit, points_fidelite, qr_code, photo_url, is_active, created_by) 
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, NULL, NULL, 1, ?)";
+                $cols = "code_client, nom, prenoms, telephone, email, adresse, zone, type_client, credit_limite, solde_credit, points_fidelite, qr_code, photo_url, is_active, created_by";
+                $vals = "?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, NULL, NULL, 1, ?";
+                if (columnExists($db, 'clients', 'livreur_id')) {
+                    $cols .= ", livreur_id";
+                    $vals .= ", ?";
+                }
+                $sql = "INSERT INTO clients ($cols) VALUES ($vals)";
                 $stmt = $db->prepare($sql);
-                $stmt->execute([$code, ($name ?: $company ?: 'Client'), '', $phone, $email, $address, $city, $client_type, $_SESSION['user_id']]);
+                $params = [$code, ($name ?: $company ?: 'Client'), '', $phone, $email, $address, $city, $client_type, $_SESSION['user_id']];
+                if (columnExists($db, 'clients', 'livreur_id')) {
+                    $params[] = $livreurAssign;
+                }
+                $stmt->execute($params);
             } else {
                 // Schéma legacy (/migrations)
-                $sql = "INSERT INTO clients (nom, prenom, entreprise, telephone, email, adresse, type_client, limite_credit, solde_credit, points_fidelite, is_active) 
-                        VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, 0, 1)";
+                $cols = "nom, prenom, entreprise, telephone, email, adresse, type_client, limite_credit, solde_credit, points_fidelite, is_active";
+                $vals = "?, ?, ?, ?, ?, ?, ?, 0, 0, 0, 1";
+                if (columnExists($db, 'clients', 'livreur_id')) {
+                    $cols .= ", livreur_id";
+                    $vals .= ", ?";
+                }
+                $sql = "INSERT INTO clients ($cols) VALUES ($vals)";
                 $stmt = $db->prepare($sql);
                 $prenom = '';
-                $stmt->execute([($name ?: $company ?: 'Client'), $prenom, $company, $phone, $email, $address, $client_type]);
+                $params = [($name ?: $company ?: 'Client'), $prenom, $company, $phone, $email, $address, $client_type];
+                if (columnExists($db, 'clients', 'livreur_id')) {
+                    $params[] = $livreurAssign;
+                }
+                $stmt->execute($params);
             }
 
             $message = 'Client créé avec succès !';
@@ -84,17 +118,57 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $company = trim($_POST['company'] ?? '');
             $client_type = $_POST['client_type'] ?? 'particulier';
 
+            // Gestion d'affectation livreur (droits):
+            // - admin: peut affecter à n'importe quel livreur
+            // - vendeur: peut affecter uniquement aux livreurs de son dépôt
+            // - livreur: ne peut pas changer l'affectation
+            $livreurAssign = null;
+            $role = $_SESSION['user_role'] ?? '';
+            if (isset($_POST['livreur_id']) && $_POST['livreur_id'] !== '' && columnExists($db, 'clients', 'livreur_id')) {
+                $candidate = (int)$_POST['livreur_id'];
+                $allow = false;
+                if ($role === 'admin') {
+                    $allow = true;
+                } elseif ($role === 'vendeur') {
+                    // Vérifier le dépôt du livreur candidat = dépôt du vendeur
+                    try {
+                        $stc = $db->prepare("SELECT depot_id FROM users WHERE id=?");
+                        $stc->execute([$candidate]);
+                        $row = $stc->fetch(PDO::FETCH_ASSOC);
+                        if ($row && (int)$row['depot_id'] === (int)($_SESSION['depot_id'] ?? 0)) $allow = true;
+                    } catch (Exception $e) {
+                    }
+                }
+                if ($allow) {
+                    $livreurAssign = $candidate;
+                }
+            }
+
             if (columnExists($db, 'clients', 'name')) {
                 $sql = "UPDATE clients SET name = ?, email = ?, phone = ?, address = ?, city = ?, postal_code = ?, 
-                        company = ?, client_type = ?, updated_at = NOW() WHERE id = ?";
+                        company = ?, client_type = ?, updated_at = NOW()";
+                $params = [$name, $email, $phone, $address, $city, $postal_code, $company, $client_type];
+                if (columnExists($db, 'clients', 'livreur_id') && $livreurAssign !== null) {
+                    $sql .= ", livreur_id = ?";
+                    $params[] = $livreurAssign;
+                }
+                $sql .= " WHERE id = ?";
+                $params[] = $id;
                 $stmt = $db->prepare($sql);
-                $stmt->execute([$name, $email, $phone, $address, $city, $postal_code, $company, $client_type, $id]);
+                $stmt->execute($params);
             } else {
                 // Schéma legacy
-                $sql = "UPDATE clients SET nom = ?, prenom = ?, entreprise = ?, telephone = ?, email = ?, adresse = ?, type_client = ?, updated_at = NOW() WHERE id = ?";
-                $stmt = $db->prepare($sql);
+                $sql = "UPDATE clients SET nom = ?, prenom = ?, entreprise = ?, telephone = ?, email = ?, adresse = ?, type_client = ?, updated_at = NOW()";
                 $prenom = '';
-                $stmt->execute([($name ?: $company ?: 'Client'), $prenom, $company, $phone, $email, $address, $client_type, $id]);
+                $params = [($name ?: $company ?: 'Client'), $prenom, $company, $phone, $email, $address, $client_type];
+                if (columnExists($db, 'clients', 'livreur_id') && $livreurAssign !== null) {
+                    $sql .= ", livreur_id = ?";
+                    $params[] = $livreurAssign;
+                }
+                $sql .= " WHERE id = ?";
+                $params[] = $id;
+                $stmt = $db->prepare($sql);
+                $stmt->execute($params);
             }
 
             $message = 'Client mis à jour avec succès !';
@@ -126,11 +200,55 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $messageType = 'error';
         }
     }
+
+    if ($action === 'bulk_assign' && hasPermission('clients_update')) {
+        try {
+            if (!columnExists($db, 'clients', 'livreur_id')) {
+                throw new Exception("Fonctionnalité non disponible: colonne 'livreur_id' absente");
+            }
+            $role = $_SESSION['user_role'] ?? '';
+            if (!in_array($role, ['admin', 'vendeur'], true)) {
+                throw new Exception('Non autorisé');
+            }
+            $livreurId = (int)($_POST['livreur_id'] ?? 0);
+            $ids = array_filter(array_map('intval', $_POST['client_ids'] ?? []));
+            if ($livreurId <= 0 || empty($ids)) {
+                throw new Exception('Sélection ou livreur invalide');
+            }
+            // Si vendeur, vérifier que le livreur appartient à son dépôt
+            if ($role === 'vendeur') {
+                $stc = $db->prepare("SELECT depot_id FROM users WHERE id=?");
+                $stc->execute([$livreurId]);
+                $row = $stc->fetch(PDO::FETCH_ASSOC);
+                if (!$row || (int)$row['depot_id'] !== (int)($_SESSION['depot_id'] ?? 0)) {
+                    throw new Exception("Livreur hors de votre dépôt");
+                }
+            }
+            // Construire l'update
+            $in = implode(',', array_fill(0, count($ids), '?'));
+            $sql = "UPDATE clients SET livreur_id = ? WHERE id IN ($in)";
+            $params = array_merge([$livreurId], $ids);
+            // Si vendeur et colonne depot présente, ne mettre à jour que les clients de son dépôt
+            if (columnExists($db, 'clients', 'depot_id') && $role === 'vendeur') {
+                $sql .= " AND depot_id = ?";
+                $params[] = (int)($_SESSION['depot_id'] ?? 0);
+            }
+            $st = $db->prepare($sql);
+            $st->execute($params);
+            $count = $st->rowCount();
+            $message = $count . ' client(s) affecté(s) avec succès';
+            $messageType = 'success';
+        } catch (Exception $e) {
+            $message = 'Affectation en masse échouée: ' . $e->getMessage();
+            $messageType = 'error';
+        }
+    }
 }
 
 // Récupérer les clients
 $search = $_GET['search'] ?? '';
 $filter = $_GET['filter'] ?? 'all';
+$affect = $_GET['affect'] ?? 'all';
 $page = max(1, intval($_GET['page'] ?? 1));
 $limit = 20;
 $offset = ($page - 1) * $limit;
@@ -138,10 +256,39 @@ $offset = ($page - 1) * $limit;
 $whereClause = columnExists($db, 'clients', 'is_active') ? "WHERE c.is_active = 1" : "WHERE 1=1";
 $params = [];
 
-// Filtrage par dépôt selon le rôle
-if ($userRole !== 'admin' && columnExists($db, 'clients', 'depot_id')) {
-    $whereClause .= " AND c.depot_id = ?";
-    $params[] = $depotId;
+// Filtrage par rôle et visibilité portefeuille
+$hasClientDepot = columnExists($db, 'clients', 'depot_id');
+if ($userRole === 'livreur' || $userRole === 'commercial') {
+    if (columnExists($db, 'clients', 'livreur_id')) {
+        $whereClause .= " AND c.livreur_id = ?";
+        $params[] = (int)($_SESSION['user_id'] ?? 0);
+    } else if (columnExists($db, 'ventes', 'livreur_id')) {
+        // fallback: clients qui ont des ventes par ce livreur
+        $whereClause .= " AND c.id IN (SELECT DISTINCT v.client_id FROM ventes v WHERE v.livreur_id = ?)";
+        $params[] = (int)($_SESSION['user_id'] ?? 0);
+    }
+} elseif ($userRole === 'vendeur') {
+    // Vendeur: clients des livreurs de son dépôt (si livreur_id dispo) sinon dépôt
+    if (columnExists($db, 'clients', 'livreur_id')) {
+        if ($hasClientDepot) {
+            $whereClause .= " AND (c.livreur_id IN (SELECT id FROM users WHERE depot_id = ?) OR (c.livreur_id IS NULL AND c.depot_id = ?))";
+            $params[] = $depotId;
+            $params[] = $depotId;
+        } else {
+            $whereClause .= " AND (c.livreur_id IN (SELECT id FROM users WHERE depot_id = ?) OR c.livreur_id IS NULL)";
+            $params[] = $depotId;
+        }
+    } elseif (columnExists($db, 'clients', 'depot_id')) {
+        $whereClause .= " AND c.depot_id = ?";
+        $params[] = $depotId;
+    }
+} else {
+    // Admin: aucune restriction supplémentaire
+}
+
+// Filtre "Sans livreur"
+if ($affect === 'none' && columnExists($db, 'clients', 'livreur_id')) {
+    $whereClause .= " AND c.livreur_id IS NULL";
 }
 
 // Recherche
@@ -184,7 +331,15 @@ if (columnExists($db, 'clients', 'created_by')) {
     $joins .= ' LEFT JOIN users u ON c.created_by = u.id ';
 }
 
-$sql = "SELECT c.*" . (strpos($joins, 'depots') !== false ? ", d.nom as depot_nom" : '') . (strpos($joins, 'users') !== false ? ", u.full_name as created_by_name" : '') .
+if (columnExists($db, 'clients', 'livreur_id')) {
+    $joins .= ' LEFT JOIN users lvr ON c.livreur_id = lvr.id ';
+}
+
+$sql = "SELECT c.*"
+    . (strpos($joins, 'depots') !== false ? ", d.nom as depot_nom" : '')
+    . (strpos($joins, 'users u') !== false ? ", u.full_name as created_by_name" : '')
+    . (strpos($joins, 'users lvr') !== false ? ", lvr.full_name as livreur_nom" : '')
+    .
     " FROM clients c " . $joins .
     " $whereClause ORDER BY c.created_at DESC LIMIT $limit OFFSET $offset";
 
@@ -231,7 +386,7 @@ include 'includes/header.php';
                 <select name="filter" class="form-select filter-select">
                     <option value="all" <?= $filter === 'all' ? 'selected' : '' ?>>Tous les types</option>
                     <option value="particulier" <?= $filter === 'particulier' ? 'selected' : '' ?>>Particuliers</option>
-                    <option value="professionnel" <?= $filter === 'professionnel' ? 'selected' : '' ?>>Professionnels</option>
+                    <option value="entreprise" <?= $filter === 'entreprise' ? 'selected' : '' ?>>Entreprise</option>
                     <option value="revendeur" <?= $filter === 'revendeur' ? 'selected' : '' ?>>Revendeurs</option>
                 </select>
             </div>
@@ -250,6 +405,15 @@ include 'includes/header.php';
             <a class="btn" href="<?= BASE_URL ?>/app/export/clients_pdf.php?search=<?= urlencode($search) ?>">
                 <i class="fas fa-file-pdf"></i> Export PDF
             </a>
+            <?php if (columnExists($db, 'clients', 'livreur_id') && in_array($userRole, ['admin', 'vendeur'], true)): ?>
+                <div class="filter-group">
+                    <label for="affect" class="form-label">Affectation</label>
+                    <select name="affect" id="affect" class="form-select filter-select">
+                        <option value="all" <?= $affect === 'all' ? 'selected' : '' ?>>Tous (affectés + sans)</option>
+                        <option value="none" <?= $affect === 'none' ? 'selected' : '' ?>>Sans livreur</option>
+                    </select>
+                </div>
+            <?php endif; ?>
         </form>
     </div>
 
@@ -261,129 +425,199 @@ include 'includes/header.php';
         </div>
     </div>
 
-    <!-- Tableau des clients -->
-    <div class="clients-table-container">
-        <table class="clients-table">
-            <thead>
-                <tr>
-                    <th>Client</th>
-                    <th>Contact</th>
-                    <th>Adresse</th>
-                    <?php if ($hasClientType): ?>
-                        <th>Type</th>
-                    <?php endif; ?>
-                    <?php if ($userRole === 'admin' && $hasDepotJoin): ?>
-                        <th>Dépôt</th>
-                    <?php endif; ?>
-                    <th>Créé le</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php if (empty($clients)): ?>
+    <!-- Action en masse + Tableau des clients -->
+    <?php $canBulk = hasPermission('clients_update') && columnExists($db, 'clients', 'livreur_id') && in_array($userRole, ['admin', 'vendeur'], true); ?>
+    <?php if ($canBulk): ?>
+        <form method="POST" class="clients-table-container" id="bulkAssignForm">
+            <input type="hidden" name="action" value="bulk_assign" />
+            <div class="d-flex align-items-center justify-content-end gap-2 p-2">
+                <label for="bulk_livreur" class="me-2">Affecter la sélection à :</label>
+                <select id="bulk_livreur" name="livreur_id" class="form-select" style="max-width: 320px">
+                    <option value="">— Sélectionner livreur —</option>
+                    <?php
+                    $role = $_SESSION['user_role'] ?? '';
+                    $sqlU = "SELECT id, full_name, depot_id FROM users WHERE 1=1";
+                    $paramsU = [];
+                    if ($role === 'vendeur') {
+                        $sqlU .= " AND depot_id = ?";
+                        $paramsU[] = (int)($_SESSION['depot_id'] ?? 0);
+                    }
+                    $sqlU .= " ORDER BY full_name";
+                    try {
+                        $lus = $db->prepare($sqlU);
+                        $lus->execute($paramsU);
+                        $uls = $lus->fetchAll(PDO::FETCH_ASSOC);
+                    } catch (Exception $e) {
+                        $uls = [];
+                    }
+                    foreach ($uls as $u): ?>
+                        <option value="<?= (int)$u['id'] ?>"><?= htmlspecialchars($u['full_name']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+                <button class="btn btn-primary" type="submit"><i class="fas fa-user-check"></i> Affecter</button>
+            </div>
+        <?php else: ?>
+            <div class="clients-table-container">
+            <?php endif; ?>
+            <table class="clients-table">
+                <thead>
                     <tr>
-                        <?php
-                        // Colonnes toujours présentes: Client, Contact, Adresse, Créé le, Actions = 5
-                        $cols = 5;
-                        if ($hasClientType) $cols++; // Type
-                        if ($userRole === 'admin' && $hasDepotJoin) $cols++; // Dépôt
-                        ?>
-                        <td colspan="<?= $cols ?>" class="no-data">
-                            <i class="fas fa-users"></i>
-                            Aucun client trouvé
-                        </td>
+                        <?php if ($canBulk): ?>
+                            <th><input type="checkbox" id="select_all_clients" /></th>
+                        <?php endif; ?>
+                        <th>Client</th>
+                        <th>Contact</th>
+                        <th>Adresse</th>
+                        <?php if ($hasClientType): ?>
+                            <th>Type</th>
+                        <?php endif; ?>
+                        <?php if ($userRole === 'admin' && $hasDepotJoin): ?>
+                            <th>Dépôt</th>
+                        <?php endif; ?>
+                        <?php if (columnExists($db, 'clients', 'livreur_id')): ?><th>Livreur</th><?php endif; ?>
+                        <th>Créé le</th>
+                        <th>Actions</th>
                     </tr>
-                <?php else: ?>
-                    <?php foreach ($clients as $client): ?>
+                </thead>
+                <tbody>
+                    <?php if (empty($clients)): ?>
                         <tr>
-                            <td>
-                                <div class="client-info">
-                                    <?php
-                                    $displayName = $client['name'] ?? trim(($client['nom'] ?? '') . ' ' . ($client['prenom'] ?? ($client['prenoms'] ?? '')));
-                                    if (!$displayName) {
-                                        $displayName = 'Client';
-                                    }
-                                    ?>
-                                    <strong><?= htmlspecialchars($displayName) ?></strong>
-                                    <?php $companyVal = $client['company'] ?? ($client['entreprise'] ?? '');
-                                    if ($companyVal): ?>
-                                        <br><small><?= htmlspecialchars($companyVal) ?></small>
-                                    <?php endif; ?>
-                                </div>
-                            </td>
-                            <td>
-                                <div class="contact-info">
-                                    <?php $emailVal = $client['email'] ?? '';
-                                    if ($emailVal): ?>
-                                        <div><i class="fas fa-envelope"></i> <?= htmlspecialchars($emailVal) ?></div>
-                                    <?php endif; ?>
-                                    <?php $phoneVal = $client['phone'] ?? ($client['telephone'] ?? '');
-                                    if ($phoneVal): ?>
-                                        <div><i class="fas fa-phone"></i> <?= htmlspecialchars($phoneVal) ?></div>
-                                    <?php endif; ?>
-                                </div>
-                            </td>
-                            <td>
-                                <div class="address-info">
-                                    <?php
-                                    $addr = $client['address'] ?? ($client['adresse'] ?? '');
-                                    $city = $client['city'] ?? ($client['zone'] ?? '');
-                                    $pc = $client['postal_code'] ?? '';
-                                    ?>
-                                    <?= htmlspecialchars($addr) ?><br>
-                                    <?= htmlspecialchars(trim($pc . ' ' . $city)) ?>
-                                </div>
-                            </td>
-                            <?php if ($hasClientType): ?>
-                                <?php
-                                $ctype = $client['client_type'] ?? ($client['type_client'] ?? null);
-                                $ctypeSafe = $ctype ? preg_replace('/[^a-z_\-]/i', '', strtolower($ctype)) : 'inconnu';
-                                ?>
-                                <td>
-                                    <span class="type-badge type-<?= htmlspecialchars($ctypeSafe) ?>">
-                                        <?= htmlspecialchars($ctype ? ucfirst($ctype) : '—') ?>
-                                    </span>
-                                </td>
-                            <?php endif; ?>
-                            <?php if ($userRole === 'admin' && $hasDepotJoin): ?>
-                                <td><?= htmlspecialchars($client['depot_nom'] ?? '') ?></td>
-                            <?php endif; ?>
-                            <td><?= date('d/m/Y', strtotime($client['created_at'])) ?></td>
-                            <td>
-                                <div class="actions">
-                                    <?php if (hasPermission('clients_update')): ?>
-                                        <button class="btn-icon btn-primary"
-                                            onclick='editClient(<?= json_encode($client, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>)'>
-                                            <i class="fas fa-edit"></i>
-                                        </button>
-                                    <?php endif; ?>
-
-                                    <?php if (hasPermission('clients_delete')): ?>
-                                        <button class="btn-icon btn-danger"
-                                            onclick="deleteClient(<?= (int)$client['id'] ?>, '<?= htmlspecialchars($displayName) ?>')">
-                                            <i class="fas fa-trash"></i>
-                                        </button>
-                                    <?php endif; ?>
-                                </div>
+                            <?php
+                            // Colonnes toujours présentes: Client, Contact, Adresse, Créé le, Actions = 5
+                            $cols = 5;
+                            if ($hasClientType) $cols++; // Type
+                            if ($userRole === 'admin' && $hasDepotJoin) $cols++; // Dépôt
+                            if (columnExists($db, 'clients', 'livreur_id')) $cols++; // Livreur
+                            ?>
+                            <td colspan="<?= $cols ?>" class="no-data">
+                                <i class="fas fa-users"></i>
+                                Aucun client trouvé
                             </td>
                         </tr>
-                    <?php endforeach; ?>
-                <?php endif; ?>
-            </tbody>
-        </table>
-    </div>
+                    <?php else: ?>
+                        <?php foreach ($clients as $client): ?>
+                            <tr>
+                                <?php if ($canBulk): ?>
+                                    <td><input type="checkbox" name="client_ids[]" value="<?= (int)$client['id'] ?>" class="client-checkbox" /></td>
+                                <?php endif; ?>
+                                <td>
+                                    <div class="client-info">
+                                        <?php
+                                        $displayName = $client['name'] ?? trim(($client['nom'] ?? '') . ' ' . ($client['prenom'] ?? ($client['prenoms'] ?? '')));
+                                        if (!$displayName) {
+                                            $displayName = 'Client';
+                                        }
+                                        ?>
+                                        <strong><?= htmlspecialchars($displayName) ?></strong>
+                                        <?php $companyVal = $client['company'] ?? ($client['entreprise'] ?? '');
+                                        if ($companyVal): ?>
+                                            <br><small><?= htmlspecialchars($companyVal) ?></small>
+                                        <?php endif; ?>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="contact-info">
+                                        <?php $emailVal = $client['email'] ?? '';
+                                        if ($emailVal): ?>
+                                            <div><i class="fas fa-envelope"></i> <?= htmlspecialchars($emailVal) ?></div>
+                                        <?php endif; ?>
+                                        <?php $phoneVal = $client['phone'] ?? ($client['telephone'] ?? '');
+                                        if ($phoneVal): ?>
+                                            <div><i class="fas fa-phone"></i> <?= htmlspecialchars($phoneVal) ?></div>
+                                        <?php endif; ?>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="address-info">
+                                        <?php
+                                        $addr = $client['address'] ?? ($client['adresse'] ?? '');
+                                        $city = $client['city'] ?? ($client['zone'] ?? '');
+                                        $pc = $client['postal_code'] ?? '';
+                                        ?>
+                                        <?= htmlspecialchars($addr) ?><br>
+                                        <?= htmlspecialchars(trim($pc . ' ' . $city)) ?>
+                                    </div>
+                                </td>
+                                <?php if ($hasClientType): ?>
+                                    <?php
+                                    $ctype = $client['client_type'] ?? ($client['type_client'] ?? null);
+                                    $ctypeSafe = $ctype ? preg_replace('/[^a-z_\-]/i', '', strtolower($ctype)) : 'inconnu';
+                                    ?>
+                                    <td>
+                                        <span class="type-badge type-<?= htmlspecialchars($ctypeSafe) ?>">
+                                            <?= htmlspecialchars($ctype ? ucfirst($ctype) : '—') ?>
+                                        </span>
+                                    </td>
+                                <?php endif; ?>
+                                <?php if ($userRole === 'admin' && $hasDepotJoin): ?>
+                                    <td><?= htmlspecialchars($client['depot_nom'] ?? '') ?></td>
+                                <?php endif; ?>
+                                <?php if (columnExists($db, 'clients', 'livreur_id')): ?>
+                                    <td><?= htmlspecialchars($client['livreur_nom'] ?? '—') ?></td>
+                                <?php endif; ?>
+                                <td><?= date('d/m/Y', strtotime($client['created_at'])) ?></td>
+                                <td>
+                                    <div class="actions">
+                                        <?php if (hasPermission('clients_update')): ?>
+                                            <?php
+                                            // Normaliser les valeurs pour le bouton d'édition (sans JS inline)
+                                            $nId = (int)$client['id'];
+                                            $nName = $displayName;
+                                            $nEmail = $client['email'] ?? '';
+                                            $nPhone = $client['phone'] ?? ($client['telephone'] ?? '');
+                                            $nAddress = $client['address'] ?? ($client['adresse'] ?? '');
+                                            $nCity = $client['city'] ?? ($client['zone'] ?? '');
+                                            $nPostal = $client['postal_code'] ?? '';
+                                            $nCompany = $client['company'] ?? ($client['entreprise'] ?? '');
+                                            $nCtype = $client['client_type'] ?? ($client['type_client'] ?? '');
+                                            $nLivreurId = isset($client['livreur_id']) ? (int)$client['livreur_id'] : '';
+                                            ?>
+                                            <button class="btn-icon btn-primary btn-edit-client"
+                                                data-id="<?= $nId ?>"
+                                                data-name="<?= htmlspecialchars($nName) ?>"
+                                                data-email="<?= htmlspecialchars($nEmail) ?>"
+                                                data-phone="<?= htmlspecialchars($nPhone) ?>"
+                                                data-address="<?= htmlspecialchars($nAddress) ?>"
+                                                data-city="<?= htmlspecialchars($nCity) ?>"
+                                                data-postal-code="<?= htmlspecialchars($nPostal) ?>"
+                                                data-company="<?= htmlspecialchars($nCompany) ?>"
+                                                data-client-type="<?= htmlspecialchars($nCtype) ?>"
+                                                data-livreur-id="<?= $nLivreurId ?>">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                        <?php endif; ?>
 
-    <!-- Pagination -->
-    <?php if ($totalPages > 1): ?>
-        <div class="pagination">
-            <?php for ($i = 1; $i <= $totalPages; $i++): ?>
-                <a href="?page=<?= $i ?>&search=<?= urlencode($search) ?>&filter=<?= urlencode($filter) ?>"
-                    class="page-link <?= $i === $page ? 'active' : '' ?>">
-                    <?= $i ?>
-                </a>
-            <?php endfor; ?>
-        </div>
-    <?php endif; ?>
+                                        <?php if (hasPermission('clients_delete')): ?>
+                                            <button class="btn-icon btn-danger btn-delete-client"
+                                                data-id="<?= (int)$client['id'] ?>"
+                                                data-name="<?= htmlspecialchars($displayName) ?>">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        <?php endif; ?>
+                                    </div>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+            <?php if ($canBulk): ?>
+        </form>
+    <?php else: ?>
+</div>
+<?php endif; ?>
+
+<!-- Pagination -->
+<?php if ($totalPages > 1): ?>
+    <div class="pagination">
+        <?php for ($i = 1; $i <= $totalPages; $i++): ?>
+            <a href="?page=<?= $i ?>&search=<?= urlencode($search) ?>&filter=<?= urlencode($filter) ?>"
+                class="page-link <?= $i === $page ? 'active' : '' ?>">
+                <?= $i ?>
+            </a>
+        <?php endfor; ?>
+    </div>
+<?php endif; ?>
 </div>
 
 <!-- Modal Nouveau Client (Bootstrap) -->
@@ -397,6 +631,36 @@ include 'includes/header.php';
                 </div>
                 <form method="POST" class="client-form">
                     <input type="hidden" name="action" value="create">
+                    <?php if (columnExists($db, 'clients', 'livreur_id')): ?>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="create_livreur">Affecter à un livreur</label>
+                                <select id="create_livreur" name="livreur_id">
+                                    <option value="">— Aucun —</option>
+                                    <?php
+                                    // Liste des livreurs, filtrée par rôle
+                                    $role = $_SESSION['user_role'] ?? '';
+                                    $sqlU = "SELECT id, full_name, depot_id FROM users WHERE 1=1";
+                                    $paramsU = [];
+                                    if ($role === 'vendeur') {
+                                        $sqlU .= " AND depot_id = ?";
+                                        $paramsU[] = (int)($_SESSION['depot_id'] ?? 0);
+                                    }
+                                    $sqlU .= " ORDER BY full_name";
+                                    try {
+                                        $lus = $db->prepare($sqlU);
+                                        $lus->execute($paramsU);
+                                        $uls = $lus->fetchAll(PDO::FETCH_ASSOC);
+                                    } catch (Exception $e) {
+                                        $uls = [];
+                                    }
+                                    foreach ($uls as $u): ?>
+                                        <option value="<?= (int)$u['id'] ?>"><?= htmlspecialchars($u['full_name']) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                        </div>
+                    <?php endif; ?>
 
                     <div class="form-row">
                         <div class="form-group">
@@ -408,7 +672,7 @@ include 'includes/header.php';
                             <label for="client_type">Type *</label>
                             <select id="client_type" name="client_type" required>
                                 <option value="particulier">Particulier</option>
-                                <option value="professionnel">Professionnel</option>
+                                <option value="entreprise">Entreprise</option>
                                 <option value="revendeur">Revendeur</option>
                             </select>
                         </div>
@@ -470,6 +734,36 @@ include 'includes/header.php';
                 <form method="POST" class="client-form" id="editClientForm">
                     <input type="hidden" name="action" value="update">
                     <input type="hidden" name="id" id="edit_id">
+                    <?php if (columnExists($db, 'clients', 'livreur_id')): ?>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="edit_livreur">Affecter à un livreur</label>
+                                <select id="edit_livreur" name="livreur_id">
+                                    <option value="">— Aucun —</option>
+                                    <?php
+                                    $role = $_SESSION['user_role'] ?? '';
+                                    $sqlU = "SELECT id, full_name, depot_id FROM users WHERE 1=1";
+                                    $paramsU = [];
+                                    if ($role === 'vendeur') {
+                                        $sqlU .= " AND depot_id = ?";
+                                        $paramsU[] = (int)($_SESSION['depot_id'] ?? 0);
+                                    }
+                                    $sqlU .= " ORDER BY full_name";
+                                    try {
+                                        $lus = $db->prepare($sqlU);
+                                        $lus->execute($paramsU);
+                                        $uls = $lus->fetchAll(PDO::FETCH_ASSOC);
+                                    } catch (Exception $e) {
+                                        $uls = [];
+                                    }
+                                    foreach ($uls as $u): ?>
+                                        <option value="<?= (int)$u['id'] ?>"><?= htmlspecialchars($u['full_name']) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <small class="text-muted">Admin: tous les livreurs. Vendeur: livreurs de son dépôt. Livreur: non modifiable.</small>
+                            </div>
+                        </div>
+                    <?php endif; ?>
 
                     <div class="form-row">
                         <div class="form-group">
@@ -481,7 +775,7 @@ include 'includes/header.php';
                             <label for="edit_client_type">Type *</label>
                             <select id="edit_client_type" name="client_type" required>
                                 <option value="particulier">Particulier</option>
-                                <option value="professionnel">Professionnel</option>
+                                <option value="entreprise">Entreprise</option>
                                 <option value="revendeur">Revendeur</option>
                             </select>
                         </div>
@@ -670,7 +964,7 @@ include 'includes/header.php';
         color: #1976d2;
     }
 
-    .type-professionnel {
+    .type-entreprise {
         background: #f3e5f5;
         color: #7b1fa2;
     }
@@ -830,66 +1124,6 @@ include 'includes/header.php';
     }
 </style>
 
-<script>
-    const _modals = {};
-
-    function openModal(modalId) {
-        const modalEl = document.getElementById(modalId);
-        if (!modalEl) return;
-        if (!window.bootstrap || !window.bootstrap.Modal) {
-            if (window.__fallbackShowModal) {
-                window.__fallbackShowModal(modalId);
-                return;
-            }
-            modalEl.classList.add('show');
-            modalEl.style.display = 'block';
-            return;
-        }
-        if (!_modals[modalId]) {
-            _modals[modalId] = new bootstrap.Modal(modalEl, {
-                backdrop: 'static'
-            });
-        }
-        _modals[modalId].show();
-    }
-
-    function editClient(client) {
-        // Normaliser les propriétés selon schéma
-        const name = client.name || [client.nom, client.prenom || client.prenoms].filter(Boolean).join(' ').trim();
-        const phone = client.phone || client.telephone || '';
-        const address = client.address || client.adresse || '';
-        const city = client.city || client.zone || '';
-        const postal = client.postal_code || '';
-        const company = client.company || client.entreprise || '';
-        const ctype = client.client_type || client.type_client || '';
-
-        document.getElementById('edit_id').value = client.id;
-        document.getElementById('edit_name').value = name || '';
-        document.getElementById('edit_email').value = client.email || '';
-        document.getElementById('edit_phone').value = phone;
-        document.getElementById('edit_address').value = address;
-        document.getElementById('edit_city').value = city;
-        document.getElementById('edit_postal_code').value = postal;
-        document.getElementById('edit_company').value = company;
-        if (ctype) document.getElementById('edit_client_type').value = ctype;
-
-        openModal('editClientModal');
-    }
-
-    function deleteClient(id, name) {
-        if (confirm(`Êtes-vous sûr de vouloir supprimer le client "${name}" ?`)) {
-            const form = document.createElement('form');
-            form.method = 'POST';
-            form.innerHTML = `
-            <input type="hidden" name="action" value="delete">
-            <input type="hidden" name="id" value="${id}">
-        `;
-            document.body.appendChild(form);
-            form.submit();
-        }
-    }
-
-    // Fermeture gérée par Bootstrap ou par le fallback global (header)
-</script>
+<script src="assets/js/clients.js"></script>
 
 <?php include 'includes/footer.php'; ?>
