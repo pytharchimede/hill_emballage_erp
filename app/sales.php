@@ -319,7 +319,7 @@ include 'includes/header.php';
                                 </thead>
                                 <tbody></tbody>
                             </table>
-                            <button type="button" class="btn btn-secondary" onclick="addItemRow()"><i class="fas fa-plus"></i> Ajouter un article</button>
+                            <button type="button" class="btn btn-secondary" id="addItemBtn"><i class="fas fa-plus"></i> Ajouter un article</button>
                             <div class="text-end" style="margin-top:1rem;">
                                 <strong>Total:</strong> <span id="saleTotal">0</span> FCFA
                             </div>
@@ -337,60 +337,10 @@ include 'includes/header.php';
             </div>
         </div>
     </div>
-    <script>
-        const PRODUCTS = <?= json_encode($products) ?>;
-
-        function addItemRow() {
-            const tbody = document.querySelector('#itemsTable tbody');
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-    <td>
-      <select class="form-select prod" onchange="syncPrice(this)">
-        <option value="">-- produit --</option>
-        ${PRODUCTS.map(p=>`<option value="${p.id}" data-price="${p.prix_unitaire}">${p.nom}</option>`).join('')}
-      </select>
-      <input type="hidden" name="items[][product_id]" class="hid-prod" />
-      <input type="hidden" name="items[][price]" class="hid-price" />
-      <input type="hidden" name="items[][qty]" class="hid-qty" />
-    </td>
-    <td><input class="form-control price" type="number" step="0.01" value="0" oninput="recalcRow(this)"/></td>
-    <td><input class="form-control qty" type="number" step="0.01" value="1" oninput="recalcRow(this)"/></td>
-    <td class="montant">0</td>
-    <td><button type="button" class="btn btn-danger" onclick="this.closest('tr').remove();recalcTotal();">&times;</button></td>
-  `;
-            tbody.appendChild(tr);
-        }
-
-        function syncPrice(sel) {
-            const opt = sel.selectedOptions[0];
-            const price = parseFloat(opt?.dataset?.price || '0');
-            const tr = sel.closest('tr');
-            tr.querySelector('.price').value = price.toString();
-            recalcRow(tr.querySelector('.qty'));
-        }
-
-        function recalcRow(input) {
-            const tr = input.closest('tr');
-            const price = parseFloat(tr.querySelector('.price').value || '0');
-            const qty = parseFloat(tr.querySelector('.qty').value || '0');
-            const m = (price * qty) || 0;
-            tr.querySelector('.montant').innerText = m.toFixed(0);
-            // populate hiddens
-            const prod = tr.querySelector('.prod').value;
-            tr.querySelector('.hid-prod').value = prod;
-            tr.querySelector('.hid-price').value = price;
-            tr.querySelector('.hid-qty').value = qty;
-            recalcTotal();
-        }
-
-        function recalcTotal() {
-            let t = 0;
-            document.querySelectorAll('#itemsTable tbody tr').forEach(tr => {
-                t += parseFloat(tr.querySelector('.montant').innerText || '0');
-            });
-            document.getElementById('saleTotal').innerText = t.toLocaleString('fr-FR');
-        }
+    <script type="application/json" id="products-data">
+        <?= json_encode($products, JSON_UNESCAPED_UNICODE) ?>
     </script>
+    <script src="<?= ASSETS_URL ?>/js/sales.js"></script>
 <?php endif; ?>
 
 <?php include 'includes/footer.php'; ?>

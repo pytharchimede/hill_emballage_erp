@@ -16,7 +16,10 @@
       e.target.classList && e.target.classList.contains("btn-danger")
         ? e.target
         : e.target.closest && e.target.closest(".btn-danger");
-    if (dangerBtn) {
+    const inItemsTable = !!(
+      e.target.closest && e.target.closest("#itemsTable")
+    );
+    if (dangerBtn && !inItemsTable) {
       if (!confirm("Êtes-vous sûr de vouloir effectuer cette action ?")) {
         e.preventDefault();
       }
