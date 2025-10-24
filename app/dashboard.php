@@ -52,9 +52,10 @@ try {
         $dateCol = $dateColExists ? 'date_vente' : 'created_at';
 
         $hasVenteDepot   = (int)$scalar("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ventes' AND COLUMN_NAME = 'depot_id'") > 0;
+        $hasVenteLivreur = (int)$scalar("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ventes' AND COLUMN_NAME = 'livreur_id'") > 0;
+        $hasVenteUser    = (int)$scalar("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ventes' AND COLUMN_NAME = 'user_id'") > 0;
         $hasVenteClient  = (int)$scalar("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ventes' AND COLUMN_NAME = 'client_id'") > 0;
         $hasClientDepot  = (int)$scalar("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'clients' AND COLUMN_NAME = 'depot_id'") > 0;
-        $hasVenteLivreur = (int)$scalar("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ventes' AND COLUMN_NAME = 'livreur_id'") > 0;
 
         $joinClients = false;
         $scopeSql = '';
@@ -63,15 +64,15 @@ try {
             if ($hasVenteDepot) {
                 $scopeSql = 'v.depot_id = ?';
                 $scopeParams[] = $depotId;
-            } elseif ($hasVenteClient && $hasClientDepot) {
-                $joinClients = true;
-                $scopeSql = 'c.depot_id = ?';
-                $scopeParams[] = $depotId;
             } elseif ($hasVenteLivreur) {
                 $scopeSql = 'v.livreur_id IN (SELECT id FROM users WHERE depot_id = ?)';
                 $scopeParams[] = $depotId;
-            } else {
+            } elseif ($hasVenteUser) {
                 $scopeSql = 'v.user_id IN (SELECT id FROM users WHERE depot_id = ?)';
+                $scopeParams[] = $depotId;
+            } elseif ($hasVenteClient && $hasClientDepot) {
+                $joinClients = true;
+                $scopeSql = 'c.depot_id = ?';
                 $scopeParams[] = $depotId;
             }
         }
@@ -82,7 +83,11 @@ try {
         $stats['depot_revenue_today'] = (int)$scalar("SELECT COALESCE(SUM(v.montant_total),0) $from WHERE $scopeSql AND DATE($dateCol) = CURDATE()", $scopeParams);
 
         // Clients du dépôt
-        if ($hasClientDepot) {
+        // Clients du dépôt: priorité au lien via livreur->users.depot, sinon colonne depot_id
+        $hasClientLivreur = (int)$scalar("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'clients' AND COLUMN_NAME = 'livreur_id'") > 0;
+        if ($hasClientLivreur) {
+            $stats['depot_clients'] = (int)$scalar("SELECT COUNT(*) FROM clients WHERE is_active = 1 AND livreur_id IN (SELECT id FROM users WHERE depot_id = ?)", [$depotId]);
+        } elseif ($hasClientDepot) {
             $stats['depot_clients'] = (int)$scalar("SELECT COUNT(*) FROM clients WHERE is_active = 1 AND depot_id = ?", [$depotId]);
         } elseif ($hasVenteClient) {
             $stats['depot_clients'] = (int)$scalar("SELECT COUNT(DISTINCT v.client_id) $from WHERE $scopeSql", $scopeParams);

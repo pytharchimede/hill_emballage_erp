@@ -210,28 +210,32 @@ if ($d2) {
     $params[] = $d2;
 }
 
-// Scoping Vendeur: restreindre aux ventes de son dépôt
+// Scoping Vendeur: restreindre aux ventes déduites du dépôt du vendeur
 $userRole = $_SESSION['user_role'] ?? '';
 if ($userRole === 'vendeur') {
     $depotId = (int)($_SESSION['depot_id'] ?? 0);
     if ($depotId > 0) {
-        $hasVenteDepot = (bool)$db->query("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME='ventes' AND COLUMN_NAME='depot_id'")->fetchColumn();
-        $hasVenteClient = (bool)$db->query("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME='ventes' AND COLUMN_NAME='client_id'")->fetchColumn();
-        $hasClientDepot = (bool)$db->query("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME='clients' AND COLUMN_NAME='depot_id'")->fetchColumn();
+        $hasVenteDepot   = (bool)$db->query("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME='ventes' AND COLUMN_NAME='depot_id'")->fetchColumn();
         $hasVenteLivreur = (bool)$db->query("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME='ventes' AND COLUMN_NAME='livreur_id'")->fetchColumn();
+        $hasVenteUser    = (bool)$db->query("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME='ventes' AND COLUMN_NAME='user_id'")->fetchColumn();
+        $hasVenteClient  = (bool)$db->query("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME='ventes' AND COLUMN_NAME='client_id'")->fetchColumn();
+        $hasClientDepot  = (bool)$db->query("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME='clients' AND COLUMN_NAME='depot_id'")->fetchColumn();
 
         if ($hasVenteDepot) {
+            // 1) Vente porte son dépôt
             $where .= " AND v.depot_id = ?";
             $params[] = $depotId;
-        } elseif ($hasVenteClient && $hasClientDepot) {
-            $where .= " AND c.depot_id = ?";
-            $params[] = $depotId;
         } elseif ($hasVenteLivreur) {
+            // 2) Déduire via livreur de la vente
             $where .= " AND v.livreur_id IN (SELECT id FROM users WHERE depot_id = ?)";
             $params[] = $depotId;
-        } else {
-            // Fallback: restreindre aux vendeurs du même dépôt
+        } elseif ($hasVenteUser) {
+            // 3) Déduire via vendeur (user_id) de la vente
             $where .= " AND v.user_id IN (SELECT id FROM users WHERE depot_id = ?)";
+            $params[] = $depotId;
+        } elseif ($hasVenteClient && $hasClientDepot) {
+            // 4) Dernier recours: dépôt du client
+            $where .= " AND c.depot_id = ?";
             $params[] = $depotId;
         }
     }
