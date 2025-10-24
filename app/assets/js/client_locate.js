@@ -3,6 +3,11 @@
   const baseUrl =
     document.querySelector('meta[name="base-url"]')?.getAttribute("content") ||
     "/";
+  // Normaliser la base: s'assurer d'une barre de fin et d'un chemin absolu
+  let apiBase = baseUrl;
+  if (!apiBase.endsWith("/")) apiBase += "/";
+  if (!/^https?:\/\//i.test(apiBase) && !apiBase.startsWith("/"))
+    apiBase = "/" + apiBase;
   const body = document.body;
   const valid = body.getAttribute("data-valid") === "1";
   if (!valid) {
@@ -15,9 +20,11 @@
   const $err = window.jQuery ? jQuery("#err") : null;
   const mapBlock = document.getElementById("mapBlock");
   const btnConfirm = document.getElementById("btnConfirm");
+  const btnDecline = document.getElementById("btnDecline");
   const addrInput = document.getElementById("addr");
   let map = null,
     marker = null;
+  const redirectTarget = "https://hillemballage.ci";
   let current = { lat: null, lon: null };
 
   function setText($el, text) {
@@ -44,7 +51,7 @@
       form.append("lat", String(lat));
       form.append("lon", String(lon));
       if (addrInput && addrInput.value) form.append("addr", addrInput.value);
-      const resp = await fetch(baseUrl + "app/api/client_location_submit.php", {
+      const resp = await fetch(apiBase + "app/api/client_location_submit.php", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: form.toString(),
@@ -54,15 +61,33 @@
         .json()
         .catch(() => ({ ok: false, error: "parse_error" }));
       if (resp.ok && data && data.ok) {
-        show($ok);
+        // Succès
         setText($status, "Position envoyée.");
+        if (window.showToast) {
+          const extra = data.address ? "\n" + data.address : "";
+          window.showToast(
+            "Merci, votre position a été partagée." + extra,
+            "success"
+          );
+        } else {
+          show($ok);
+        }
+        // Redirection après un court délai
+        setTimeout(function () {
+          window.location.href = redirectTarget;
+        }, 1400);
       } else {
+        const msg = (data && data.error) || "Erreur inconnue";
+        if (window.showToast) window.showToast(msg, "error");
         show($err);
-        setText($err, (data && data.error) || "Erreur inconnue");
+        setText($err, msg);
       }
+      return data;
     } catch (e) {
+      if (window.showToast) window.showToast("Erreur réseau", "error");
       show($err);
       setText($err, "Erreur réseau");
+      return { ok: false, error: "network_error" };
     }
   }
 
@@ -99,11 +124,10 @@
     hide($err);
     hide($ok);
     if (!("geolocation" in navigator)) {
+      const msg = "La géolocalisation n'est pas disponible sur cet appareil.";
+      if (window.showToast) window.showToast(msg, "error");
       show($err);
-      setText(
-        $err,
-        "La géolocalisation n'est pas disponible sur cet appareil."
-      );
+      setText($err, msg);
       return;
     }
     setText($status, "Demande d'autorisation de localisation…");
@@ -117,18 +141,30 @@
         ensureMap(latitude, longitude);
       },
       function (error) {
-        let msg = "Impossible d'obtenir votre position.";
-        if (error && error.message) msg += " " + error.message;
+        let msg = "Partage de position annulé.";
+        if (error && error.code === 1) {
+          // PERMISSION_DENIED
+          msg = "Partage de position annulé.";
+        } else {
+          msg =
+            "Impossible d'obtenir votre position." +
+            (error && error.message ? " " + error.message : "");
+        }
+        if (window.showToast) window.showToast(msg, "info");
         show($err);
         setText($err, msg);
         setText($status, "");
+        // Rediriger en cas de refus/cas d'erreur
+        setTimeout(function () {
+          window.location.href = redirectTarget;
+        }, 1400);
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
   }
 
   document.getElementById("btnShare")?.addEventListener("click", onClick);
-  btnConfirm?.addEventListener("click", function () {
+  btnConfirm?.addEventListener("click", async function () {
     hide($err);
     hide($ok);
     if (current.lat == null || current.lon == null) {
@@ -136,6 +172,26 @@
       return;
     }
     setText($status, "Envoi en cours…");
-    sendPosition(current.lat, current.lon);
+    // Désactiver temporairement le bouton pour éviter les doublons
+    btnConfirm.setAttribute("disabled", "disabled");
+    try {
+      await sendPosition(current.lat, current.lon);
+    } finally {
+      btnConfirm.removeAttribute("disabled");
+    }
   });
+
+  // Bouton Refuser
+  btnDecline?.addEventListener("click", function () {
+    if (window.showToast)
+      window.showToast("Partage de position annulé.", "info");
+    setTimeout(function () {
+      window.location.href = redirectTarget;
+    }, 1400);
+  });
+
+  // Essayer d'obtenir la position automatiquement à l'ouverture (certains navigateurs exigent une interaction utilisateur)
+  try {
+    onClick();
+  } catch (e) {}
 })();

@@ -5,7 +5,8 @@ $idParam = isset($_GET['id']) ? $_GET['id'] : (isset($_GET['vente']) ? $_GET['ve
 $id = $idParam !== null ? (int)$idParam : 0;
 $sig = $_GET['sig'] ?? '';
 $valid = $id > 0 && $sig && hash_equals(hash_hmac('sha256', (string)$id, LINK_SIGN_SECRET), $sig);
-$baseUrl = htmlspecialchars(BASE_URL, ENT_QUOTES, 'UTF-8');
+$baseUrl = BASE_URL;
+$baseHref = htmlspecialchars(rtrim($baseUrl, '/') . '/', ENT_QUOTES, 'UTF-8');
 ?>
 <!doctype html>
 <html lang="fr">
@@ -14,11 +15,12 @@ $baseUrl = htmlspecialchars(BASE_URL, ENT_QUOTES, 'UTF-8');
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Partager ma position</title>
-    <meta name="base-url" content="<?= $baseUrl ?>" />
+    <meta name="base-url" content="<?= $baseHref ?>" />
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+    <link href="<?= htmlspecialchars(ASSETS_URL, ENT_QUOTES, 'UTF-8') ?>/css/toast.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" crossorigin="anonymous" />
-    <link href="<?= $baseUrl ?>app/assets/css/client_locate.css" rel="stylesheet">
+    <link href="<?= htmlspecialchars(ASSETS_URL, ENT_QUOTES, 'UTF-8') ?>/css/client_locate.css" rel="stylesheet">
 </head>
 
 <body data-id="<?= (int)$id ?>" data-sig="<?= htmlspecialchars($sig, ENT_QUOTES, 'UTF-8') ?>" data-valid="<?= $valid ? '1' : '0' ?>">
@@ -41,8 +43,9 @@ $baseUrl = htmlspecialchars(BASE_URL, ENT_QUOTES, 'UTF-8');
                             <label for="addr" class="form-label">Complément d'adresse (facultatif)</label>
                             <input type="text" id="addr" class="form-control" placeholder="Bâtiment, étage, portail, repères…" />
                         </div>
-                        <div class="d-grid mt-3">
-                            <button id="btnConfirm" class="btn btn-success btn-lg">Confirmer et envoyer</button>
+                        <div class="d-flex gap-2 mt-3">
+                            <button id="btnConfirm" class="btn btn-success btn-lg flex-fill">Confirmer et envoyer</button>
+                            <button id="btnDecline" class="btn btn-outline-secondary btn-lg" type="button">Refuser</button>
                         </div>
                     </div>
                     <div id="ok" class="alert alert-success mt-3 d-none">Merci, votre position a été partagée. Vous pouvez fermer cette page.</div>
@@ -53,8 +56,9 @@ $baseUrl = htmlspecialchars(BASE_URL, ENT_QUOTES, 'UTF-8');
         </div>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
+    <script src="<?= htmlspecialchars(ASSETS_URL, ENT_QUOTES, 'UTF-8') ?>/js/toast.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js" crossorigin="anonymous"></script>
-    <script src="<?= $baseUrl ?>app/assets/js/client_locate.js"></script>
+    <script src="<?= htmlspecialchars(ASSETS_URL, ENT_QUOTES, 'UTF-8') ?>/js/client_locate.js"></script>
 </body>
 
 </html>
