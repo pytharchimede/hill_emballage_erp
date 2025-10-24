@@ -47,18 +47,53 @@ try {
             $stats['pending_payments'] = (int)$scalar("SELECT COUNT(*) FROM payments WHERE statut = 'attente'");
         }
     } elseif ($userRole === 'vendeur') {
-        $userId  = $_SESSION['user_id'] ?? null;
-        $depotId = $_SESSION['depot_id'] ?? null;
-        // Compter mes ventes (nombre) et mon CA du jour
-        $stats['my_sales_today']   = (int)$scalar("SELECT COUNT(*) FROM ventes WHERE user_id = ? AND DATE(created_at) = CURDATE()", [$userId]);
-        $stats['my_revenue_today'] = (int)$scalar("SELECT COALESCE(SUM(montant_total),0) FROM ventes WHERE user_id = ? AND DATE(created_at) = CURDATE()", [$userId]);
-        // Mes clients (distinct via ventes ou via table clients du dépôt)
-        if (!isset($stats['my_clients'])) {
-            $stats['my_clients'] = (int)$scalar("SELECT COUNT(DISTINCT client_id) FROM ventes WHERE user_id = ?", [$userId]);
+        $depotId = (int)($_SESSION['depot_id'] ?? 0);
+        $dateColExists = (int)$scalar("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ventes' AND COLUMN_NAME = 'date_vente'") > 0;
+        $dateCol = $dateColExists ? 'date_vente' : 'created_at';
+
+        $hasVenteDepot   = (int)$scalar("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ventes' AND COLUMN_NAME = 'depot_id'") > 0;
+        $hasVenteClient  = (int)$scalar("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ventes' AND COLUMN_NAME = 'client_id'") > 0;
+        $hasClientDepot  = (int)$scalar("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'clients' AND COLUMN_NAME = 'depot_id'") > 0;
+        $hasVenteLivreur = (int)$scalar("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ventes' AND COLUMN_NAME = 'livreur_id'") > 0;
+
+        $joinClients = false;
+        $scopeSql = '';
+        $scopeParams = [];
+        if ($depotId > 0) {
+            if ($hasVenteDepot) {
+                $scopeSql = 'v.depot_id = ?';
+                $scopeParams[] = $depotId;
+            } elseif ($hasVenteClient && $hasClientDepot) {
+                $joinClients = true;
+                $scopeSql = 'c.depot_id = ?';
+                $scopeParams[] = $depotId;
+            } elseif ($hasVenteLivreur) {
+                $scopeSql = 'v.livreur_id IN (SELECT id FROM users WHERE depot_id = ?)';
+                $scopeParams[] = $depotId;
+            } else {
+                $scopeSql = 'v.user_id IN (SELECT id FROM users WHERE depot_id = ?)';
+                $scopeParams[] = $depotId;
+            }
         }
-        // Commandes en attente (statut)
-        $stats['pending_orders']   = (int)$scalar("SELECT COUNT(*) FROM ventes WHERE user_id = ? AND statut = 'attente'", [$userId]);
-        // Stock par dépôt
+
+        // Ventes du dépôt aujourd'hui (nombre et CA)
+        $from = ' FROM ventes v ' . ($joinClients ? 'LEFT JOIN clients c ON v.client_id = c.id ' : '');
+        $stats['depot_sales_today'] = (int)$scalar("SELECT COUNT(*) $from WHERE $scopeSql AND DATE($dateCol) = CURDATE()", $scopeParams);
+        $stats['depot_revenue_today'] = (int)$scalar("SELECT COALESCE(SUM(v.montant_total),0) $from WHERE $scopeSql AND DATE($dateCol) = CURDATE()", $scopeParams);
+
+        // Clients du dépôt
+        if ($hasClientDepot) {
+            $stats['depot_clients'] = (int)$scalar("SELECT COUNT(*) FROM clients WHERE is_active = 1 AND depot_id = ?", [$depotId]);
+        } elseif ($hasVenteClient) {
+            $stats['depot_clients'] = (int)$scalar("SELECT COUNT(DISTINCT v.client_id) $from WHERE $scopeSql", $scopeParams);
+        } else {
+            $stats['depot_clients'] = 0;
+        }
+
+        // Commandes en attente (du dépôt)
+        $stats['depot_pending_orders'] = (int)$scalar("SELECT COUNT(*) $from WHERE $scopeSql AND v.statut = 'attente'", $scopeParams);
+
+        // Stock par dépôt (inchangé)
         $stats['stock_items']      = (int)$scalar("SELECT COUNT(*) FROM stock WHERE depot_id = ? AND quantite > 0", [$depotId]);
         $stats['low_stock_items']  = (int)$scalar("SELECT COUNT(*) FROM stock WHERE depot_id = ? AND quantite <= COALESCE(seuil_alerte, 0)", [$depotId]);
     } elseif ($userRole === 'livreur') {
@@ -242,8 +277,8 @@ include 'includes/header.php';
                     <i class="fas fa-shopping-cart"></i>
                 </div>
                 <div class="stat-info">
-                    <h3><?= number_format($stats['my_sales_today'] ?? 0) ?></h3>
-                    <p>Mes Ventes Aujourd'hui</p>
+                    <h3><?= number_format($stats['depot_sales_today'] ?? 0) ?></h3>
+                    <p>Ventes du Dépôt Aujourd'hui</p>
                 </div>
             </div>
 
@@ -252,8 +287,8 @@ include 'includes/header.php';
                     <i class="fas fa-euro-sign"></i>
                 </div>
                 <div class="stat-info">
-                    <h3><?= number_format($stats['my_revenue_today'] ?? 0, 0, ',', ' ') ?> FCFA</h3>
-                    <p>Mon CA Aujourd'hui</p>
+                    <h3><?= number_format($stats['depot_revenue_today'] ?? 0, 0, ',', ' ') ?> FCFA</h3>
+                    <p>CA du Dépôt Aujourd'hui</p>
                 </div>
             </div>
 
@@ -262,8 +297,8 @@ include 'includes/header.php';
                     <i class="fas fa-users"></i>
                 </div>
                 <div class="stat-info">
-                    <h3><?= number_format($stats['my_clients'] ?? 0) ?></h3>
-                    <p>Mes Clients</p>
+                    <h3><?= number_format($stats['depot_clients'] ?? 0) ?></h3>
+                    <p>Clients du Dépôt</p>
                 </div>
             </div>
 
@@ -272,8 +307,8 @@ include 'includes/header.php';
                     <i class="fas fa-clock"></i>
                 </div>
                 <div class="stat-info">
-                    <h3><?= number_format($stats['pending_orders'] ?? 0) ?></h3>
-                    <p>Commandes en Attente</p>
+                    <h3><?= number_format($stats['depot_pending_orders'] ?? 0) ?></h3>
+                    <p>Commandes du Dépôt en Attente</p>
                 </div>
             </div>
 

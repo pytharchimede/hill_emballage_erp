@@ -10,6 +10,9 @@ if (!hasPermission('stock_read')) {
     exit();
 }
 
+$userRole = $_SESSION['user_role'] ?? '';
+$userDepotId = (int)($_SESSION['depot_id'] ?? 0);
+
 $msg = '';
 $msgType = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -58,6 +61,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // Filtres
 $search = $_GET['search'] ?? '';
 $depot = (int)($_GET['depot'] ?? 0);
+// Vendeur: forcer son propre dépôt
+if ($userRole === 'vendeur' && $userDepotId > 0) {
+    $depot = $userDepotId;
+}
 $page = max(1, (int)($_GET['page'] ?? 1));
 $limit = 20;
 $offset = ($page - 1) * $limit;
@@ -83,7 +90,14 @@ $st->execute($params);
 $rows = $st->fetchAll(PDO::FETCH_ASSOC);
 $pages = max(1, (int)ceil($total / $limit));
 
-$depots = $db->query('SELECT id, nom FROM depots WHERE is_active=1 ORDER BY nom')->fetchAll(PDO::FETCH_ASSOC);
+// Restreindre la liste des dépôts pour les vendeurs
+if ($userRole === 'vendeur' && $userDepotId > 0) {
+    $ds = $db->prepare('SELECT id, nom FROM depots WHERE is_active=1 AND id=? ORDER BY nom');
+    $ds->execute([$userDepotId]);
+    $depots = $ds->fetchAll(PDO::FETCH_ASSOC);
+} else {
+    $depots = $db->query('SELECT id, nom FROM depots WHERE is_active=1 ORDER BY nom')->fetchAll(PDO::FETCH_ASSOC);
+}
 $products = $db->query('SELECT id, nom FROM products WHERE is_active=1 ORDER BY nom')->fetchAll(PDO::FETCH_ASSOC);
 
 $pageTitle = 'Stock';
@@ -102,7 +116,9 @@ include 'includes/header.php';
         <div class="col-md-4"><input class="form-control" name="search" placeholder="Rechercher produit/code" value="<?= htmlspecialchars($search) ?>" /></div>
         <div class="col-md-3">
             <select class="form-select" name="depot">
-                <option value="0">Tous dépôts</option>
+                <?php if (!($userRole === 'vendeur' && $userDepotId > 0)): ?>
+                    <option value="0">Tous dépôts</option>
+                <?php endif; ?>
                 <?php foreach ($depots as $d): ?><option value="<?= (int)$d['id'] ?>" <?= $depot === (int)$d['id'] ? 'selected' : '' ?>><?= htmlspecialchars($d['nom']) ?></option><?php endforeach; ?>
             </select>
         </div>
@@ -188,6 +204,9 @@ include 'includes/header.php';
     $td1 = $_GET['td1'] ?? '';
     $td2 = $_GET['td2'] ?? '';
     $tdepot = (int)($_GET['tdepot'] ?? 0);
+    if ($userRole === 'vendeur' && $userDepotId > 0) {
+        $tdepot = $userDepotId;
+    }
     $tprod = trim($_GET['tprod'] ?? '');
     $jpage = max(1, (int)($_GET['jpage'] ?? 1));
     $jlimit = max(5, min(100, (int)($_GET['jlimit'] ?? 20))); // borne 5..100
@@ -241,7 +260,9 @@ include 'includes/header.php';
         <div class="col-md-3"><input class="form-control" type="date" name="td2" value="<?= htmlspecialchars($td2) ?>" /></div>
         <div class="col-md-3">
             <select class="form-select" name="tdepot">
-                <option value="0">Tous dépôts</option>
+                <?php if (!($userRole === 'vendeur' && $userDepotId > 0)): ?>
+                    <option value="0">Tous dépôts</option>
+                <?php endif; ?>
                 <?php foreach ($depots as $d): ?><option value="<?= (int)$d['id'] ?>" <?= $tdepot === (int)$d['id'] ? 'selected' : '' ?>><?= htmlspecialchars($d['nom']) ?></option><?php endforeach; ?>
             </select>
         </div>

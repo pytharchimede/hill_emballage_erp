@@ -210,6 +210,33 @@ if ($d2) {
     $params[] = $d2;
 }
 
+// Scoping Vendeur: restreindre aux ventes de son dépôt
+$userRole = $_SESSION['user_role'] ?? '';
+if ($userRole === 'vendeur') {
+    $depotId = (int)($_SESSION['depot_id'] ?? 0);
+    if ($depotId > 0) {
+        $hasVenteDepot = (bool)$db->query("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME='ventes' AND COLUMN_NAME='depot_id'")->fetchColumn();
+        $hasVenteClient = (bool)$db->query("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME='ventes' AND COLUMN_NAME='client_id'")->fetchColumn();
+        $hasClientDepot = (bool)$db->query("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME='clients' AND COLUMN_NAME='depot_id'")->fetchColumn();
+        $hasVenteLivreur = (bool)$db->query("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME='ventes' AND COLUMN_NAME='livreur_id'")->fetchColumn();
+
+        if ($hasVenteDepot) {
+            $where .= " AND v.depot_id = ?";
+            $params[] = $depotId;
+        } elseif ($hasVenteClient && $hasClientDepot) {
+            $where .= " AND c.depot_id = ?";
+            $params[] = $depotId;
+        } elseif ($hasVenteLivreur) {
+            $where .= " AND v.livreur_id IN (SELECT id FROM users WHERE depot_id = ?)";
+            $params[] = $depotId;
+        } else {
+            // Fallback: restreindre aux vendeurs du même dépôt
+            $where .= " AND v.user_id IN (SELECT id FROM users WHERE depot_id = ?)";
+            $params[] = $depotId;
+        }
+    }
+}
+
 $countSql = "SELECT COUNT(*) as t FROM ventes v LEFT JOIN clients c ON v.client_id=c.id $where";
 $cs = $db->prepare($countSql);
 $cs->execute($params);
@@ -225,7 +252,33 @@ $rows = $st->fetchAll(PDO::FETCH_ASSOC);
 $pages = max(1, (int)ceil($total / $limit));
 
 // Data for forms
-$clients = $db->query("SELECT id, COALESCE(CONCAT(nom, ' ', IFNULL(prenom,'')), nom) as label FROM clients WHERE is_active=1 ORDER BY nom")->fetchAll(PDO::FETCH_ASSOC);
+$clients = [];
+try {
+    $isActiveCol = (bool)$db->query("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME='clients' AND COLUMN_NAME='is_active'")->fetchColumn();
+    $hasClientDepot = (bool)$db->query("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME='clients' AND COLUMN_NAME='depot_id'")->fetchColumn();
+    $hasClientLivreur = (bool)$db->query("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME='clients' AND COLUMN_NAME='livreur_id'")->fetchColumn();
+    $baseWhere = $isActiveCol ? 'WHERE is_active=1' : 'WHERE 1=1';
+    $sqlC = "SELECT id, COALESCE(CONCAT(nom, ' ', IFNULL(prenom,'')), nom) as label FROM clients $baseWhere";
+    $paramsC = [];
+    if ($userRole === 'vendeur') {
+        $depotId = (int)($_SESSION['depot_id'] ?? 0);
+        if ($depotId > 0) {
+            if ($hasClientDepot) {
+                $sqlC .= " AND depot_id = ?";
+                $paramsC[] = $depotId;
+            } elseif ($hasClientLivreur) {
+                $sqlC .= " AND (livreur_id IN (SELECT id FROM users WHERE depot_id = ?) OR livreur_id IS NULL)";
+                $paramsC[] = $depotId;
+            }
+        }
+    }
+    $sqlC .= " ORDER BY nom";
+    $stc = $db->prepare($sqlC);
+    $stc->execute($paramsC);
+    $clients = $stc->fetchAll(PDO::FETCH_ASSOC);
+} catch (Exception $e) {
+    $clients = [];
+}
 $products = $db->query("SELECT id, nom, prix_unitaire, prix_credit FROM products WHERE is_active=1 ORDER BY nom")->fetchAll(PDO::FETCH_ASSOC);
 
 // Préparer liste des livreurs (priorité: même dépôt que le vendeur si disponible)
@@ -242,7 +295,8 @@ try {
     }
     if ($roleCol) {
         if ($depotSeller && $hasUserDepot) {
-            $sqlL = "SELECT id, full_name FROM users WHERE $roleCol='livreur'" . ($hasUserActive ? " AND is_active=1" : "") . " ORDER BY (depot_id=? ) DESC, full_name";
+            // Vendeur: uniquement les livreurs de son dépôt
+            $sqlL = "SELECT id, full_name FROM users WHERE $roleCol='livreur'" . ($hasUserActive ? " AND is_active=1" : "") . " AND depot_id=? ORDER BY full_name";
             $stL = $db->prepare($sqlL);
             $stL->execute([$depotSeller]);
             $livreurs = $stL->fetchAll(PDO::FETCH_ASSOC);
