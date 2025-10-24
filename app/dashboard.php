@@ -97,10 +97,17 @@ try {
         // Chiffres d'affaires
         $stats['revenue_today']   = (int)$scalar("SELECT COALESCE(SUM(montant_total),0) FROM ventes WHERE DATE(created_at) = CURDATE()");
         $stats['revenue_month']   = (int)$scalar("SELECT COALESCE(SUM(montant_total),0) FROM ventes WHERE MONTH(created_at) = MONTH(CURDATE()) AND YEAR(created_at) = YEAR(CURDATE())");
-        // Paiements
-        $stats['pending_payments'] = (int)$scalar("SELECT COUNT(*) FROM payments WHERE statut = 'attente'");
-        $stats['paid_payments']   = (int)$scalar("SELECT COUNT(*) FROM payments WHERE statut = 'paye'");
-        $stats['overdue_payments'] = (int)$scalar("SELECT COUNT(*) FROM payments WHERE statut = 'retard'");
+        // Paiements (recalibrés pour refléter l'encours réel)
+        // En attente = nombre de ventes avec solde dû (quel que soit l'état des enregistrements payments)
+        $stats['pending_payments'] = (int)$scalar("SELECT COUNT(*) FROM ventes WHERE montant_paye < montant_total");
+        // Reçus (paiements validés)
+        $stats['paid_payments']   = (int)$scalar("SELECT COUNT(*) FROM payments WHERE statut = 'valide'");
+        // Rejetés (anciennement 'retard' inexistant dans les statuts réels)
+        $stats['overdue_payments'] = (int)$scalar("SELECT COUNT(*) FROM payments WHERE statut = 'rejete'");
+        // Montants utiles pour le comptable (basés sur la date de paiement déclarée)
+        $stats['received_today_amount'] = (int)$scalar("SELECT COALESCE(SUM(montant),0) FROM payments WHERE statut='valide' AND date_payment = CURDATE()");
+        $stats['outstanding_total_amount'] = (int)$scalar("SELECT COALESCE(SUM(montant_total - montant_paye),0) FROM ventes WHERE montant_paye < montant_total");
+        $stats['outstanding_today_amount'] = (int)$scalar("SELECT COALESCE(SUM(montant_total - montant_paye),0) FROM ventes WHERE DATE(created_at)=CURDATE() AND montant_paye < montant_total");
         // Factures du jour = ventes du jour
         $stats['total_invoices']  = (int)$scalar("SELECT COUNT(*) FROM ventes WHERE DATE(created_at) = CURDATE()");
     }
@@ -394,6 +401,16 @@ include 'includes/header.php';
                 </div>
             </div>
 
+            <div class="stat-card primary">
+                <div class="stat-icon">
+                    <i class="fas fa-hand-holding-usd"></i>
+                </div>
+                <div class="stat-info">
+                    <h3><?= number_format($stats['received_today_amount'] ?? 0, 0, ',', ' ') ?> FCFA</h3>
+                    <p>Encaissements Reçus Aujourd'hui</p>
+                </div>
+            </div>
+
             <div class="stat-card warning">
                 <div class="stat-icon">
                     <i class="fas fa-clock"></i>
@@ -416,6 +433,16 @@ include 'includes/header.php';
 
             <div class="stat-card secondary">
                 <div class="stat-icon">
+                    <i class="fas fa-hand-holding"></i>
+                </div>
+                <div class="stat-info">
+                    <h3><?= number_format($stats['outstanding_total_amount'] ?? 0, 0, ',', ' ') ?> FCFA</h3>
+                    <p>À Recevoir (Total)</p>
+                </div>
+            </div>
+
+            <div class="stat-card secondary">
+                <div class="stat-icon">
                     <i class="fas fa-file-invoice"></i>
                 </div>
                 <div class="stat-info">
@@ -430,7 +457,7 @@ include 'includes/header.php';
                 </div>
                 <div class="stat-info">
                     <h3><?= number_format($stats['overdue_payments'] ?? 0) ?></h3>
-                    <p>Paiements en Retard</p>
+                    <p>Paiements Rejetés</p>
                 </div>
             </div>
         </div>
