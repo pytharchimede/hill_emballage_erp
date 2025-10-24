@@ -2,7 +2,7 @@
 require_once 'includes/config.php';
 require_once 'includes/migrations.php';
 requireLogin();
-if (!hasPermission('view_reports') && !in_array($_SESSION['user_role'] ?? '', ['livreur', 'commercial'], true)) {
+if (!hasPermission('view_reports') && !in_array($_SESSION['user_role'] ?? '', ['livreur', 'commercial', 'vendeur'], true)) {
     setFlashMessage('warning', "Accès refusé.");
     header('Location: dashboard.php');
     exit();
@@ -53,7 +53,7 @@ $loadHeader->execute([$livreurId, $selectedDate]);
 $load = $loadHeader->fetch(PDO::FETCH_ASSOC);
 $loadItems = [];
 if ($load) {
-    $it = $db->prepare("SELECT i.*, p.nom as produit_nom FROM livreur_load_items i JOIN products p ON i.produit_id=p.id WHERE i.load_id=? ORDER BY p.nom");
+    $it = $db->prepare("SELECT i.*, p.nom as produit_nom, c.nom as client_nom FROM livreur_load_items i JOIN products p ON i.produit_id=p.id LEFT JOIN clients c ON i.client_id=c.id WHERE i.load_id=? ORDER BY p.nom");
     $it->execute([$load['id']]);
     $loadItems = $it->fetchAll(PDO::FETCH_ASSOC);
 }
@@ -108,6 +108,9 @@ $payStmt->execute([$livreurId, $selectedDate]);
 $paymentsByLivreur = (float)$payStmt->fetch(PDO::FETCH_ASSOC)['s'];
 $ecartPV = $paymentsByLivreur - $totalRemis;
 
+// Colonne statut des paniers disponible ?
+$hasLoadStatus = (int)$db->query("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME='livreur_loads' AND COLUMN_NAME='status'")->fetchColumn() > 0;
+
 // Enregistrement form (load/remit)
 $msg = '';
 $msgType = '';
@@ -123,32 +126,131 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             header('Location: ' . $_SERVER['REQUEST_URI']);
             exit();
         }
-        if (($_POST['action'] ?? '') === 'create_load' && hasPermission('stock_update')) {
+        if (($_POST['action'] ?? '') === 'save_load') {
+            // Enregistrer/mettre à jour un panier en brouillon (sans impacter le stock)
             $depot_id = (int)($_POST['depot_id'] ?? ($_SESSION['depot_id'] ?? 0));
             $items = json_decode($_POST['items_json'] ?? '[]', true) ?: [];
             if ($depot_id <= 0 || !$items) throw new Exception('Données incomplètes');
+            // Autorisations: livreur (pour lui-même) ou vendeur/gerant/admin
+            $role = $_SESSION['user_role'] ?? '';
+            if (!in_array($role, ['livreur', 'commercial', 'vendeur', 'gerant', 'admin'], true)) throw new Exception('Non autorisé');
+            if (in_array($role, ['livreur', 'commercial'], true) && ($livreurId !== (int)($_SESSION['user_id'] ?? 0))) throw new Exception('Non autorisé');
+
             $db->beginTransaction();
-            $db->prepare("INSERT INTO livreur_loads (livreur_id,depot_id,date_load,notes,created_by) VALUES (?,?,?,?,?)")
-                ->execute([$livreurId, $depot_id, $selectedDate, trim($_POST['notes'] ?? ''), $_SESSION['user_id'] ?? null]);
-            $loadId = (int)$db->lastInsertId();
-            $ins = $db->prepare("INSERT INTO livreur_load_items (load_id,produit_id,quantite) VALUES (?,?,?)");
-            // Déduction du stock dépôt (validation stricte)
-            $selStock = $db->prepare('SELECT id, quantite FROM stock WHERE produit_id=? AND depot_id=? FOR UPDATE');
-            $updStock = $db->prepare('UPDATE stock SET quantite = quantite - ? WHERE id=?');
+            // Chercher un brouillon existant pour ce jour
+            $loadId = null;
+            if ($hasLoadStatus) {
+                $q = $db->prepare("SELECT id FROM livreur_loads WHERE livreur_id=? AND date_load=? AND status='draft' ORDER BY id DESC LIMIT 1");
+            } else {
+                $q = $db->prepare("SELECT id FROM livreur_loads WHERE livreur_id=? AND date_load=? ORDER BY id DESC LIMIT 1");
+            }
+            $q->execute([$livreurId, $selectedDate]);
+            $row = $q->fetch(PDO::FETCH_ASSOC);
+            if ($row) {
+                $loadId = (int)$row['id'];
+                // Mettre à jour depot/notes
+                if ($hasLoadStatus) {
+                    $db->prepare("UPDATE livreur_loads SET depot_id=?, notes=?, updated_at=NOW() WHERE id=? AND (status='draft' OR status IS NULL)")
+                        ->execute([$depot_id, trim($_POST['notes'] ?? ''), $loadId]);
+                } else {
+                    $db->prepare("UPDATE livreur_loads SET depot_id=?, notes=? WHERE id=?")
+                        ->execute([$depot_id, trim($_POST['notes'] ?? ''), $loadId]);
+                }
+                $db->prepare("DELETE FROM livreur_load_items WHERE load_id=?")->execute([$loadId]);
+            } else {
+                if ($hasLoadStatus) {
+                    $db->prepare("INSERT INTO livreur_loads (livreur_id,depot_id,date_load,status,notes,created_by) VALUES (?,?,?,?,?,?)")
+                        ->execute([$livreurId, $depot_id, $selectedDate, 'draft', trim($_POST['notes'] ?? ''), $_SESSION['user_id'] ?? null]);
+                } else {
+                    $db->prepare("INSERT INTO livreur_loads (livreur_id,depot_id,date_load,notes,created_by) VALUES (?,?,?,?,?)")
+                        ->execute([$livreurId, $depot_id, $selectedDate, trim($_POST['notes'] ?? ''), $_SESSION['user_id'] ?? null]);
+                }
+                $loadId = (int)$db->lastInsertId();
+            }
+            $ins = $db->prepare("INSERT INTO livreur_load_items (load_id,produit_id,quantite,client_id,client_lat,client_lng) VALUES (?,?,?,?,?,?)");
             foreach ($items as $it) {
                 $pid = (int)($it['produit_id'] ?? 0);
                 $q = (float)($it['quantite'] ?? 0);
+                if ($pid && $q > 0) {
+                    $cid = isset($it['client_id']) ? (int)$it['client_id'] : null;
+                    $clat = isset($it['client_lat']) ? (float)$it['client_lat'] : null;
+                    $clng = isset($it['client_lng']) ? (float)$it['client_lng'] : null;
+                    $ins->execute([$loadId, $pid, $q, $cid, $clat, $clng]);
+                }
+            }
+            // Audit snapshot du brouillon
+            try {
+                $aud = $db->prepare("INSERT INTO livreur_load_audits (load_id, action, items_json, notes, user_id) VALUES (?,?,?,?,?)");
+                $aud->execute([$loadId, 'save', json_encode($items, JSON_UNESCAPED_UNICODE), trim($_POST['notes'] ?? ''), $_SESSION['user_id'] ?? null]);
+            } catch (Exception $e) {
+                // ne pas bloquer si audit indisponible
+            }
+            $db->commit();
+            setFlashMessage('success', 'Panier enregistré en brouillon');
+            header('Location: ' . $_SERVER['REQUEST_URI']);
+            exit();
+        }
+
+        if (($_POST['action'] ?? '') === 'validate_load') {
+            // Valider le panier: décrémenter le stock et marquer validé
+            $role = $_SESSION['user_role'] ?? '';
+            if (!in_array($role, ['vendeur', 'gerant', 'admin', 'comptable'], true)) throw new Exception('Non autorisé à valider');
+            // Recharger le dernier load du jour (ou via load_id)
+            $loadId = isset($_POST['load_id']) ? (int)$_POST['load_id'] : 0;
+            if (!$loadId) {
+                $q = $db->prepare("SELECT id FROM livreur_loads WHERE livreur_id=? AND date_load=? ORDER BY id DESC LIMIT 1");
+                $q->execute([$livreurId, $selectedDate]);
+                $row = $q->fetch(PDO::FETCH_ASSOC);
+                if ($row) $loadId = (int)$row['id'];
+            }
+            if (!$loadId) throw new Exception('Aucun panier à valider');
+            // Si status existe, ne valider que les brouillons
+            if ($hasLoadStatus) {
+                $stt = $db->prepare("SELECT status,depot_id FROM livreur_loads WHERE id=?");
+                $stt->execute([$loadId]);
+                $lr = $stt->fetch(PDO::FETCH_ASSOC);
+                if (!$lr) throw new Exception('Panier introuvable');
+                if (($lr['status'] ?? 'draft') !== 'draft') throw new Exception('Panier déjà validé');
+                $depot_id = (int)$lr['depot_id'];
+            } else {
+                $depot_id = (int)($_POST['depot_id'] ?? ($_SESSION['depot_id'] ?? 0));
+            }
+            // Décrémenter stock pour les items du load
+            $db->beginTransaction();
+            // Récupérer items pour décrémenter le stock et auditer
+            $itemsStmt = $db->prepare("SELECT produit_id, quantite, client_id, client_lat, client_lng FROM livreur_load_items WHERE load_id=?");
+            $itemsStmt->execute([$loadId]);
+            $itemsData = $itemsStmt->fetchAll(PDO::FETCH_ASSOC);
+            $selStock = $db->prepare('SELECT id, quantite FROM stock WHERE produit_id=? AND depot_id=? FOR UPDATE');
+            $updStock = $db->prepare('UPDATE stock SET quantite = quantite - ? WHERE id=?');
+            foreach ($itemsData as $it) {
+                $pid = (int)$it['produit_id'];
+                $q = (float)$it['quantite'];
                 if ($pid && $q > 0) {
                     $selStock->execute([$pid, $depot_id]);
                     $sr = $selStock->fetch(PDO::FETCH_ASSOC);
                     if (!$sr) throw new Exception('Stock indisponible pour le produit ID ' . $pid . ' au dépôt');
                     if (((float)$sr['quantite']) < $q) throw new Exception('Stock insuffisant pour le produit ID ' . $pid . ' (disponible: ' . ((float)$sr['quantite']) . ')');
                     $updStock->execute([$q, (int)$sr['id']]);
-                    $ins->execute([$loadId, $pid, $q]);
                 }
             }
+            if ($hasLoadStatus) {
+                $db->prepare("UPDATE livreur_loads SET status='validated', validated_by=?, validated_at=NOW(), updated_at=NOW() WHERE id=?")
+                    ->execute([$_SESSION['user_id'] ?? null, $loadId]);
+            }
+            // Audit snapshot de la validation
+            try {
+                // Récupérer notes courantes du load
+                $noteRow = $db->prepare("SELECT notes FROM livreur_loads WHERE id=?");
+                $noteRow->execute([$loadId]);
+                $notes = ($noteRow->fetch(PDO::FETCH_ASSOC)['notes'] ?? null);
+                $aud = $db->prepare("INSERT INTO livreur_load_audits (load_id, action, items_json, notes, user_id) VALUES (?,?,?,?,?)");
+                $aud->execute([$loadId, 'validate', json_encode($itemsData, JSON_UNESCAPED_UNICODE), $notes, $_SESSION['user_id'] ?? null]);
+            } catch (Exception $e) {
+                // ne pas bloquer si audit indisponible
+            }
             $db->commit();
-            setFlashMessage('success', 'Panier enregistré');
+            setFlashMessage('success', 'Panier validé');
             header('Location: ' . $_SERVER['REQUEST_URI']);
             exit();
         }
@@ -224,6 +326,7 @@ include 'includes/header.php';
                 <tr>
                     <th>Produit</th>
                     <th class="text-end">Qté</th>
+                    <th>Client</th>
                 </tr>
             </thead>
             <tbody>
@@ -231,10 +334,11 @@ include 'includes/header.php';
                     <tr>
                         <td><?= htmlspecialchars($it['produit_nom']) ?></td>
                         <td class="text-end"><?= number_format($it['quantite'], 0, ',', ' ') ?></td>
+                        <td><?= htmlspecialchars($it['client_nom'] ?? '') ?></td>
                     </tr>
                 <?php endforeach; ?>
                 <?php if (!$loadItems): ?><tr>
-                        <td colspan="2">—</td>
+                        <td colspan="3">—</td>
                     </tr><?php endif; ?>
             </tbody>
         </table>
@@ -242,11 +346,24 @@ include 'includes/header.php';
         <p>— Aucun panier enregistré pour ce jour.</p>
     <?php endif; ?>
 
-    <?php if (hasPermission('stock_update') && $livreurId): ?>
+    <?php
+    $role = $_SESSION['user_role'] ?? '';
+    $canEditDraft = in_array($role, ['livreur', 'commercial', 'vendeur', 'gerant', 'admin'], true) && $livreurId;
+    $canValidate = in_array($role, ['vendeur', 'gerant', 'admin', 'comptable'], true) && $livreurId;
+    if ($canEditDraft): ?>
         <hr />
         <h3>Enregistrer un panier</h3>
-        <form method="post" class="mb-3" onsubmit="return addItemsJson()">
-            <input type="hidden" name="action" value="create_load" />
+        <?php
+        // Préparer une datalist clients pour l'autocomplete
+        $clientsList = $db->query("SELECT id, nom FROM clients WHERE is_active=1 ORDER BY nom")->fetchAll(PDO::FETCH_ASSOC);
+        ?>
+        <datalist id="clients_datalist">
+            <?php foreach ($clientsList as $cl): ?>
+                <option value="<?= (int)$cl['id'] ?>"><?= htmlspecialchars($cl['nom']) ?></option>
+            <?php endforeach; ?>
+        </datalist>
+        <form method="post" class="mb-3" id="load-form">
+            <input type="hidden" name="action" value="save_load" />
             <input type="hidden" name="items_json" id="items_json" value="[]" />
             <div class="row g-2">
                 <div class="col-md-3"><label class="form-label">Dépôt</label><input class="form-control" name="depot_id" value="<?= (int)($_SESSION['depot_id'] ?? 0) ?>" required /></div>
@@ -254,44 +371,18 @@ include 'includes/header.php';
             </div>
             <div class="mt-2">
                 <div id="items_area" class="row g-2"></div>
-                <button class="btn btn-secondary mt-2" type="button" onclick="addRow()">+ Ajouter un produit</button>
+                <button class="btn btn-secondary mt-2" type="button" data-add-item>+ Ajouter un produit</button>
             </div>
             <div class="mt-3"><button class="btn btn-success" type="submit">Enregistrer le panier</button></div>
         </form>
-        <script>
-            const products = [];
-
-            function addRow() {
-                const wrap = document.getElementById('items_area');
-                const idx = wrap.children.length;
-                const row = document.createElement('div');
-                row.className = 'col-12';
-                row.innerHTML = `<div class="row g-2 align-items-end">
-        <div class="col-md-6"><label class="form-label">Produit</label><input class="form-control" name="p_${idx}_id" required placeholder="ID produit"/></div>
-        <div class="col-md-4"><label class="form-label">Quantité</label><input class="form-control" name="p_${idx}_q" type="number" step="0.01" required/></div>
-        <div class="col-md-2"><button class="btn btn-danger" type="button" onclick="this.closest('.col-12').remove()">Supprimer</button></div>
-      </div>`;
-                wrap.appendChild(row);
-            }
-
-            function addItemsJson() {
-                const wrap = document.getElementById('items_area');
-                const rows = [...wrap.querySelectorAll('.col-12')];
-                const items = [];
-                rows.forEach((r) => {
-                    const id = r.querySelector('input[name$="_id"]').value.trim();
-                    const q = r.querySelector('input[name$="_q"]').value.trim();
-                    if (id && q) {
-                        items.push({
-                            produit_id: parseInt(id, 10),
-                            quantite: parseFloat(q)
-                        });
-                    }
-                });
-                document.getElementById('items_json').value = JSON.stringify(items);
-                return items.length > 0;
-            }
-        </script>
+        <?php if ($canValidate && $load): ?>
+            <form method="post" class="mt-2">
+                <input type="hidden" name="action" value="validate_load" />
+                <input type="hidden" name="load_id" value="<?= (int)$load['id'] ?>" />
+                <button class="btn">Valider le panier</button>
+            </form>
+        <?php endif; ?>
+        <script src="<?= ASSETS_URL ?>/js/livreur_load.js" defer></script>
     <?php endif; ?>
 </div>
 

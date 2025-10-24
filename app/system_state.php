@@ -22,8 +22,8 @@ function scalar(PDO $db, $sql, $p = [])
     return $r ? (float)$r[0] : 0;
 }
 $hasDeliveryDate = scalar($db, "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME='ventes' AND COLUMN_NAME='delivery_date'") > 0;
-$livreDateExpr = $hasDeliveryDate ? 'delivery_date' : 'DATE(updated_at)';
-$venteDateExpr = 'DATE(created_at)';
+$livreDateExpr = $hasDeliveryDate ? 'DATE(v.delivery_date)' : 'DATE(v.updated_at)';
+$venteDateExpr = 'DATE(v.created_at)';
 
 $pageTitle = 'Etat général du système';
 include 'includes/header.php';

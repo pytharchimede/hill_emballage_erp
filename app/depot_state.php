@@ -45,8 +45,8 @@ function scalar(PDO $db, $sql, $p = [])
     return $r ? (float)$r[0] : 0;
 }
 $hasDeliveryDate = scalar($db, "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME='ventes' AND COLUMN_NAME='delivery_date'") > 0;
-$livreDateExpr = $hasDeliveryDate ? 'delivery_date' : 'DATE(updated_at)';
-$venteDateExpr = 'DATE(created_at)';
+$livreDateExpr = $hasDeliveryDate ? 'DATE(v.delivery_date)' : 'DATE(v.updated_at)';
+$venteDateExpr = 'DATE(v.created_at)';
 
 $kpiPanier = 0;
 $kpiLivre = 0;
@@ -54,14 +54,24 @@ $kpiVendu = 0;
 $kpiCredit = 0;
 $kpiRemis = 0;
 $perLivreur = [];
+// Statut validé requis pour compter le panier ?
+$hasLoadStatus = scalar($db, "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME='livreur_loads' AND COLUMN_NAME='status'") > 0;
 foreach ($livreurs as $l) {
     $lid = (int)$l['id'];
-    $panier = scalar($db, "SELECT COALESCE(SUM(i.quantite),0) FROM livreur_load_items i JOIN livreur_loads l ON i.load_id=l.id WHERE l.livreur_id=? AND l.date_load=?", [$lid, $selectedDate]);
+    $panierSql = "SELECT COALESCE(SUM(i.quantite),0) FROM livreur_load_items i JOIN livreur_loads l ON i.load_id=l.id WHERE l.livreur_id=? AND l.date_load=?";
+    if ($hasLoadStatus) {
+        $panierSql .= " AND l.status='validated'";
+    }
+    $panier = scalar($db, $panierSql, [$lid, $selectedDate]);
+    $hasDraft = false;
+    if ($hasLoadStatus) {
+        $hasDraft = scalar($db, "SELECT COUNT(*) FROM livreur_loads WHERE livreur_id=? AND date_load=? AND status='draft'", [$lid, $selectedDate]) > 0;
+    }
     $livre  = scalar($db, "SELECT COALESCE(SUM(v.montant_total),0) FROM ventes v WHERE v.livreur_id=? AND $livreDateExpr=?", [$lid, $selectedDate]);
     $vendu  = scalar($db, "SELECT COALESCE(SUM(v.montant_total),0) FROM ventes v WHERE v.livreur_id=? AND $venteDateExpr=? AND v.montant_paye >= v.montant_total", [$lid, $selectedDate]);
     $credit = scalar($db, "SELECT COALESCE(SUM(v.montant_total - v.montant_paye),0) FROM ventes v WHERE v.livreur_id=? AND $venteDateExpr=? AND v.montant_paye < v.montant_total", [$lid, $selectedDate]);
     $remis  = scalar($db, "SELECT COALESCE(SUM(amount),0) FROM livreur_remittances WHERE livreur_id=? AND date_remit=?", [$lid, $selectedDate]);
-    $perLivreur[] = ['id' => $lid, 'nom' => $l['full_name'], 'panier' => $panier, 'livre' => $livre, 'vendu' => $vendu, 'credit' => $credit, 'remis' => $remis];
+    $perLivreur[] = ['id' => $lid, 'nom' => $l['full_name'], 'panier' => $panier, 'livre' => $livre, 'vendu' => $vendu, 'credit' => $credit, 'remis' => $remis, 'has_draft' => $hasDraft];
     $kpiPanier += $panier;
     $kpiLivre += $livre;
     $kpiVendu += $vendu;
@@ -128,7 +138,10 @@ include 'includes/header.php';
         <tbody>
             <?php foreach ($perLivreur as $r): ?>
                 <tr>
-                    <td><?= htmlspecialchars($r['nom']) ?></td>
+                    <td>
+                        <?= htmlspecialchars($r['nom']) ?>
+                        <?php if (!empty($r['has_draft'])): ?><span class="badge bg-warning ms-2">à valider</span><?php endif; ?>
+                    </td>
                     <td class="text-end"><?= number_format($r['panier'], 0, ',', ' ') ?></td>
                     <td class="text-end"><?= number_format($r['livre'], 0, ',', ' ') ?></td>
                     <td class="text-end"><?= number_format($r['vendu'], 0, ',', ' ') ?></td>
