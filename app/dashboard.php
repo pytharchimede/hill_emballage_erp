@@ -1,5 +1,6 @@
 <?php
 require_once 'includes/config.php';
+/** @var PDO $db */
 
 // Vérifier la connexion
 if (!isLoggedIn()) {
@@ -11,72 +12,72 @@ $userRole = $_SESSION['user_role'];
 $userName = $_SESSION['user_name'];
 $depotName = $_SESSION['depot_name'] ?? 'Non assigné';
 
-// Obtenir des statistiques selon le rôle
+// Obtenir des stats réelles alignées avec le schéma (ventes, paiements, stock, etc.)
 $stats = [];
-
 try {
-    switch ($userRole) {
-        case 'admin':
-            // Statistiques globales pour admin
-            $statsQueries = [
-                'total_users' => "SELECT COUNT(*) as count FROM users WHERE is_active = 1",
-                'total_clients' => "SELECT COUNT(*) as count FROM clients WHERE is_active = 1",
-                'total_sales_today' => "SELECT COUNT(*) as count FROM sales WHERE DATE(created_at) = CURDATE()",
-                'revenue_today' => "SELECT COALESCE(SUM(total_amount), 0) as amount FROM sales WHERE DATE(created_at) = CURDATE()",
-                'total_stock' => "SELECT COUNT(*) as count FROM stock WHERE quantity > 0",
-                'low_stock' => "SELECT COUNT(*) as count FROM stock WHERE quantity <= stock_min",
-                'total_depots' => "SELECT COUNT(*) as count FROM depots WHERE is_active = 1",
-                'pending_payments' => "SELECT COUNT(*) as count FROM payments WHERE status = 'pending'",
-            ];
-            break;
+    // Stats de base via la fonction utilitaire déjà alignée au schéma
+    $stats = getDashboardStats($userRole, $_SESSION['user_id'] ?? null) ?: [];
 
-        case 'vendeur':
-            // Statistiques pour vendeur
-            $depotId = $_SESSION['depot_id'];
-            $statsQueries = [
-                'my_sales_today' => "SELECT COUNT(*) as count FROM sales WHERE DATE(created_at) = CURDATE() AND depot_id = ?",
-                'my_revenue_today' => "SELECT COALESCE(SUM(total_amount), 0) as amount FROM sales WHERE DATE(created_at) = CURDATE() AND depot_id = ?",
-                'my_clients' => "SELECT COUNT(*) as count FROM clients WHERE depot_id = ? AND is_active = 1",
-                'pending_orders' => "SELECT COUNT(*) as count FROM sales WHERE status = 'pending' AND depot_id = ?",
-                'stock_items' => "SELECT COUNT(*) as count FROM stock WHERE depot_id = ? AND quantity > 0",
-                'low_stock_items' => "SELECT COUNT(*) as count FROM stock WHERE depot_id = ? AND quantity <= stock_min",
-            ];
-            break;
-
-        case 'livreur':
-            // Statistiques pour livreur
-            $depotId = $_SESSION['depot_id'];
-            $statsQueries = [
-                'deliveries_today' => "SELECT COUNT(*) as count FROM deliveries WHERE DATE(delivery_date) = CURDATE() AND depot_id = ?",
-                'pending_deliveries' => "SELECT COUNT(*) as count FROM deliveries WHERE status = 'pending' AND depot_id = ?",
-                'completed_deliveries' => "SELECT COUNT(*) as count FROM deliveries WHERE status = 'delivered' AND depot_id = ?",
-                'total_clients' => "SELECT COUNT(*) as count FROM clients WHERE depot_id = ? AND is_active = 1",
-            ];
-            break;
-
-        case 'comptable':
-            // Statistiques pour comptable
-            $statsQueries = [
-                'revenue_today' => "SELECT COALESCE(SUM(total_amount), 0) as amount FROM sales WHERE DATE(created_at) = CURDATE()",
-                'revenue_month' => "SELECT COALESCE(SUM(total_amount), 0) as amount FROM sales WHERE MONTH(created_at) = MONTH(CURDATE()) AND YEAR(created_at) = YEAR(CURDATE())",
-                'pending_payments' => "SELECT COUNT(*) as count FROM payments WHERE status = 'pending'",
-                'paid_payments' => "SELECT COUNT(*) as count FROM payments WHERE status = 'paid'",
-                'total_invoices' => "SELECT COUNT(*) as count FROM sales WHERE DATE(created_at) = CURDATE()",
-                'overdue_payments' => "SELECT COUNT(*) as count FROM payments WHERE status = 'overdue'",
-            ];
-            break;
-    }
-
-    // Exécuter les requêtes
-    foreach ($statsQueries as $key => $query) {
-        $stmt = $db->prepare($query);
-        if (in_array($userRole, ['vendeur', 'livreur']) && strpos($query, '?') !== false) {
-            $stmt->execute([$depotId]);
-        } else {
-            $stmt->execute();
+    // Petites fonctions utilitaires locales
+    $scalar = function ($sql, $params = []) {
+        global $db;
+        try {
+            $st = $db->prepare($sql);
+            $st->execute($params);
+            $row = $st->fetch(PDO::FETCH_NUM);
+            return $row ? (float)$row[0] : 0;
+        } catch (Exception $e) {
+            return 0;
         }
-        $result = $stmt->fetch(PDO::FETCH_ASSOC);
-        $stats[$key] = $result['count'] ?? $result['amount'] ?? 0;
+    };
+
+    if ($userRole === 'admin') {
+        // Compléter les cartes attendues par le dashboard
+        $stats['total_users']       = (int)$scalar("SELECT COUNT(*) FROM users WHERE is_active = 1");
+        $stats['total_clients']     = isset($stats['clients_count']) ? (int)$stats['clients_count'] : (int)$scalar("SELECT COUNT(*) FROM clients WHERE is_active = 1");
+        $stats['total_sales_today'] = (int)$scalar("SELECT COUNT(*) FROM ventes WHERE DATE(created_at) = CURDATE()");
+        $stats['revenue_today']     = (int)$scalar("SELECT COALESCE(SUM(montant_total),0) FROM ventes WHERE DATE(created_at) = CURDATE()");
+        $stats['total_stock']       = (int)$scalar("SELECT COUNT(*) FROM stock WHERE quantite > 0");
+        // low_stock déjà fourni par getDashboardStats sous 'low_stock'
+        if (!isset($stats['low_stock'])) {
+            $stats['low_stock'] = (int)$scalar("SELECT COUNT(*) FROM stock WHERE quantite <= COALESCE(seuil_alerte, 0)");
+        }
+        $stats['total_depots']      = (int)$scalar("SELECT COUNT(*) FROM depots WHERE is_active = 1");
+        if (!isset($stats['pending_payments'])) {
+            $stats['pending_payments'] = (int)$scalar("SELECT COUNT(*) FROM payments WHERE statut = 'attente'");
+        }
+    } elseif ($userRole === 'vendeur') {
+        $userId  = $_SESSION['user_id'] ?? null;
+        $depotId = $_SESSION['depot_id'] ?? null;
+        // Compter mes ventes (nombre) et mon CA du jour
+        $stats['my_sales_today']   = (int)$scalar("SELECT COUNT(*) FROM ventes WHERE user_id = ? AND DATE(created_at) = CURDATE()", [$userId]);
+        $stats['my_revenue_today'] = (int)$scalar("SELECT COALESCE(SUM(montant_total),0) FROM ventes WHERE user_id = ? AND DATE(created_at) = CURDATE()", [$userId]);
+        // Mes clients (distinct via ventes ou via table clients du dépôt)
+        if (!isset($stats['my_clients'])) {
+            $stats['my_clients'] = (int)$scalar("SELECT COUNT(DISTINCT client_id) FROM ventes WHERE user_id = ?", [$userId]);
+        }
+        // Commandes en attente (statut)
+        $stats['pending_orders']   = (int)$scalar("SELECT COUNT(*) FROM ventes WHERE user_id = ? AND statut = 'attente'", [$userId]);
+        // Stock par dépôt
+        $stats['stock_items']      = (int)$scalar("SELECT COUNT(*) FROM stock WHERE depot_id = ? AND quantite > 0", [$depotId]);
+        $stats['low_stock_items']  = (int)$scalar("SELECT COUNT(*) FROM stock WHERE depot_id = ? AND quantite <= COALESCE(seuil_alerte, 0)", [$depotId]);
+    } elseif ($userRole === 'livreur') {
+        $depotId = $_SESSION['depot_id'] ?? null;
+        // On assimile les livraisons aux ventes validées/livrées
+        $stats['deliveries_today']    = (int)$scalar("SELECT COUNT(*) FROM ventes WHERE depot_id = ? AND statut = 'livree' AND DATE(updated_at) = CURDATE()", [$depotId]);
+        $stats['pending_deliveries']  = (int)$scalar("SELECT COUNT(*) FROM ventes WHERE depot_id = ? AND statut = 'validee'", [$depotId]);
+        $stats['completed_deliveries'] = (int)$scalar("SELECT COUNT(*) FROM ventes WHERE depot_id = ? AND statut = 'livree'", [$depotId]);
+        $stats['total_clients']       = (int)$scalar("SELECT COUNT(*) FROM clients WHERE depot_id = ? AND is_active = 1", [$depotId]);
+    } elseif ($userRole === 'comptable') {
+        // Chiffres d'affaires
+        $stats['revenue_today']   = (int)$scalar("SELECT COALESCE(SUM(montant_total),0) FROM ventes WHERE DATE(created_at) = CURDATE()");
+        $stats['revenue_month']   = (int)$scalar("SELECT COALESCE(SUM(montant_total),0) FROM ventes WHERE MONTH(created_at) = MONTH(CURDATE()) AND YEAR(created_at) = YEAR(CURDATE())");
+        // Paiements
+        $stats['pending_payments'] = (int)$scalar("SELECT COUNT(*) FROM payments WHERE statut = 'attente'");
+        $stats['paid_payments']   = (int)$scalar("SELECT COUNT(*) FROM payments WHERE statut = 'paye'");
+        $stats['overdue_payments'] = (int)$scalar("SELECT COUNT(*) FROM payments WHERE statut = 'retard'");
+        // Factures du jour = ventes du jour
+        $stats['total_invoices']  = (int)$scalar("SELECT COUNT(*) FROM ventes WHERE DATE(created_at) = CURDATE()");
     }
 } catch (Exception $e) {
     $stats = [];
