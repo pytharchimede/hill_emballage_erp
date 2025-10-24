@@ -153,6 +153,8 @@ function getMenuForRole($role)
         'admin' => [
             'dashboard' => ['icon' => 'fas fa-tachometer-alt', 'title' => 'Tableau de bord', 'url' => BASE_URL . '/web_admin/dashboard.php'],
             'activity' => ['icon' => 'fas fa-history', 'title' => 'Activité', 'url' => BASE_URL . '/web_admin/activity.php'],
+            'depots' => ['icon' => 'fas fa-warehouse', 'title' => 'Dépôts', 'url' => BASE_URL . '/web_admin/depots.php'],
+            'depots_map' => ['icon' => 'fas fa-map-location-dot', 'title' => 'Carte des dépôts', 'url' => BASE_URL . '/web_admin/depots_map.php'],
             'clients' => ['icon' => 'fas fa-users', 'title' => 'Clients', 'url' => BASE_URL . '/web_admin/clients.php'],
             'products' => ['icon' => 'fas fa-box', 'title' => 'Produits', 'url' => BASE_URL . '/web_admin/products.php'],
             'sales' => ['icon' => 'fas fa-shopping-cart', 'title' => 'Ventes', 'url' => BASE_URL . '/web_admin/sales.php'],
@@ -206,6 +208,11 @@ function getRolePermissions($role)
             'delete',
             'manage_users',
             'view_reports',
+            // Dépôts
+            'depots_read',
+            'depots_create',
+            'depots_update',
+            'depots_delete',
             'clients_read',
             'clients_create',
             'clients_update',
