@@ -16,6 +16,7 @@
   const itemsTable = document.getElementById("itemsTable");
   const addBtn = document.getElementById("addItemBtn");
   const saleTotalEl = document.getElementById("saleTotal");
+  const saleForm = document.getElementById("saleForm");
 
   function optionList() {
     return ['<option value="">-- produit --</option>']
@@ -113,6 +114,35 @@
         const tr = btn.closest("tr");
         tr.remove();
         recalcTotal();
+      }
+    });
+  }
+
+  // Avant soumission: s'assurer que les champs cachés sont à jour et qu'il y a au moins un article valide
+  if (saleForm) {
+    saleForm.addEventListener("submit", function (e) {
+      let t = 0;
+      const rows = itemsTable
+        ? Array.from(itemsTable.querySelectorAll("tbody tr"))
+        : [];
+      rows.forEach((tr) => {
+        // forcer recalcul pour remplir les hidden
+        recalcRow(tr);
+        t += parseFloat(tr.querySelector(".montant").innerText || "0");
+      });
+      if (!rows.length || !(t > 0)) {
+        e.preventDefault();
+        // Afficher un message dans le modal
+        const body = saleForm.querySelector(".modal-body");
+        if (body) {
+          const prev = body.querySelector(".sale-alert");
+          if (prev) prev.remove();
+          const alert = document.createElement("div");
+          alert.className = "alert alert-warning sale-alert";
+          alert.textContent =
+            "Veuillez ajouter au moins un article avec un montant strictement positif.";
+          body.prepend(alert);
+        }
       }
     });
   }

@@ -23,7 +23,7 @@ foreach ($rows as $r) {
     echo '<li class="list-group-item d-flex justify-content-between align-items-center">'
         . '<a href="' . htmlspecialchars($r['path']) . '" target="_blank">' . basename(parse_url($r['path'], PHP_URL_PATH)) . '</a>'
         . '<span class="small">par ' . htmlspecialchars($r['full_name'] ?? '') . '</span>'
-        . (hasPermission($entity === 'ventes' ? 'sales_update' : ($entity === 'payments' ? 'payments_update' : 'write')) ? '<button class="btn btn-danger btn-sm" onclick="deleteAttachment(' . (int)$r['id'] . ')"><i class="fas fa-trash"></i></button>' : '')
+        . (hasPermission($entity === 'ventes' ? 'sales_update' : ($entity === 'payments' ? 'payments_update' : 'write')) ? '<button class="btn btn-danger btn-sm" data-delete-attachment="' . (int)$r['id'] . '"><i class="fas fa-trash"></i></button>' : '')
         . '</li>';
 }
 echo '</ul>';

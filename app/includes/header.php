@@ -457,11 +457,36 @@
                 <?php
                 $currentPath = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH);
                 $currentPage = basename($currentPath ?: ($_SERVER['PHP_SELF'] ?? ''));
+                $currQueryStr = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_QUERY);
+                $currQuery = [];
+                if ($currQueryStr) parse_str($currQueryStr, $currQuery);
                 $menu = getMenuForRole($_SESSION['user_role']);
                 foreach ($menu as $key => $item):
                     $itemPath = parse_url($item['url'], PHP_URL_PATH);
                     $itemPage = basename($itemPath);
-                    $isActive = ($currentPage === $itemPage) ? 'active' : '';
+                    $itemQueryStr = parse_url($item['url'], PHP_URL_QUERY);
+                    $itemQuery = [];
+                    if ($itemQueryStr) parse_str($itemQueryStr, $itemQuery);
+                    $isPathMatch = ($currentPage === $itemPage);
+                    $isActive = '';
+                    if ($isPathMatch) {
+                        if (!empty($itemQuery)) {
+                            // actif si toutes les paires de l'item sont présentes et égales dans la requête courante
+                            $match = true;
+                            foreach ($itemQuery as $k => $v) {
+                                if (!isset($currQuery[$k]) || (string)$currQuery[$k] !== (string)$v) {
+                                    $match = false;
+                                    break;
+                                }
+                            }
+                            if ($match) $isActive = 'active';
+                        } else {
+                            // sans query, actif seulement si aucune version plus spécifique n'est demandée (ex: mine=1)
+                            if (!isset($currQuery['mine']) || (string)$currQuery['mine'] !== '1') {
+                                $isActive = 'active';
+                            }
+                        }
+                    }
                 ?>
                     <a href="<?= $item['url'] ?>" class="menu-item <?= $isActive ?>">
                         <i class="<?= $item['icon'] ?>"></i>

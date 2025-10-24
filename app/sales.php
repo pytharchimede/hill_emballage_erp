@@ -249,7 +249,7 @@ include 'includes/header.php';
                         <?php endif; ?>
                         <a class="btn" title="Facture PDF" href="<?= BASE_URL ?>/app/export/invoice_pdf.php?id=<?= (int)$v['id'] ?>"><i class="fas fa-file-pdf"></i></a>
                         <?php if (hasPermission('sales_update')): ?>
-                            <button class="btn" title="Joindre" onclick="showAttach('ventes', <?= (int)$v['id'] ?>)"><i class="fas fa-paperclip"></i></button>
+                            <button class="btn btn-attach" title="Joindre" data-attach-entity="ventes" data-attach-id="<?= (int)$v['id'] ?>"><i class="fas fa-paperclip"></i></button>
                         <?php endif; ?>
                     </td>
                 </tr>
@@ -355,7 +355,7 @@ include 'includes/header.php';
                 <div class="modal-body">
                     <input type="hidden" name="entity" id="att_entity" value="" />
                     <input type="hidden" name="entity_id" id="att_entity_id" value="" />
-                    <input type="hidden" name="redirect" value="<?= BASE_URL ?>/web_admin/sales.php" />
+                    <input type="hidden" name="redirect" value="<?= htmlspecialchars($_SERVER['REQUEST_URI'] ?? (BASE_URL . '/app/sales.php')) ?>" />
                     <div class="mb-3"><input class="form-control" type="file" name="file" required /></div>
                     <div id="att_list" class="small"></div>
                 </div>
@@ -364,29 +364,4 @@ include 'includes/header.php';
         </div>
     </div>
 </div>
-<script>
-    function showAttach(entity, id) {
-        document.getElementById('att_entity').value = entity;
-        document.getElementById('att_entity_id').value = id;
-        loadAttachments(entity, id);
-        const el = document.getElementById('attachModal');
-        if (window.bootstrap && window.bootstrap.Modal) new bootstrap.Modal(el).show();
-        else if (window.__fallbackShowModal) window.__fallbackShowModal('attachModal');
-    }
-    async function loadAttachments(entity, id) {
-        try {
-            const resp = await fetch('<?= BASE_URL ?>/app/export/attachments_list.php?entity=' + encodeURIComponent(entity) + '&id=' + id);
-            const html = await resp.text();
-            document.getElementById('att_list').innerHTML = html;
-        } catch (e) {
-            document.getElementById('att_list').innerHTML = '<em>Erreur de chargement.</em>';
-        }
-    }
-    async function deleteAttachment(attId) {
-        if (!confirm('Supprimer cette pièce ?')) return;
-        const resp = await fetch('<?= BASE_URL ?>/app/export/attachments_delete.php?id=' + attId, {
-            method: 'POST'
-        });
-        location.reload();
-    }
-</script>
+<script src="<?= ASSETS_URL ?>/js/attachments.js"></script>
