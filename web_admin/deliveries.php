@@ -83,7 +83,8 @@ include __DIR__ . '/../app/includes/header.php';
                     </div>
                 </div>
             </div>
-            <div class="modal-footer">
+            <div class="modal-footer d-flex justify-content-between">
+                <button class="btn btn-outline-secondary" id="dl_print_btn"><i class="fas fa-print"></i> Imprimer la fiche</button>
                 <button class="btn btn-success" id="dl_confirm_btn"><i class="fas fa-check"></i> Confirmer la livraison</button>
             </div>
         </div>

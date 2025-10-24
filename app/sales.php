@@ -34,6 +34,7 @@ $hasDeliveryAddress = colExistsSales($db, 'ventes', 'delivery_address');
 $hasDeliveryLat = colExistsSales($db, 'ventes', 'delivery_latitude');
 $hasDeliveryLng = colExistsSales($db, 'ventes', 'delivery_longitude');
 $hasDeliveryDetails = colExistsSales($db, 'ventes', 'delivery_details');
+$hasDeliveryDate = colExistsSales($db, 'ventes', 'delivery_date');
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
     try {
@@ -52,6 +53,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $del_lat = $hasDeliveryLat && $_POST['delivery_latitude'] !== '' ? (float)$_POST['delivery_latitude'] : null;
             $del_lng = $hasDeliveryLng && $_POST['delivery_longitude'] !== '' ? (float)$_POST['delivery_longitude'] : null;
             $del_details = $hasDeliveryDetails ? trim($_POST['delivery_details'] ?? '') : '';
+            $del_date = $hasDeliveryDate ? ($_POST['delivery_date'] ?: null) : null;
 
             if ($client_id <= 0 || empty($items)) {
                 throw new Exception("Client ou articles manquants");
@@ -117,6 +119,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($hasDeliveryDetails) {
                     $cols[] = 'delivery_details';
                     $vals[] = $del_details ?: null;
+                }
+                if ($hasDeliveryDate) {
+                    $cols[] = 'delivery_date';
+                    $vals[] = $del_date ?: null;
                 }
             }
             $sql = "INSERT INTO ventes (" . implode(',', $cols) . ") VALUES (" . rtrim(str_repeat('?,', count($cols)), ',') . ")";
@@ -429,12 +435,17 @@ include 'includes/header.php';
                                         <div id="delivery_map" style="width:100%; height:260px; border-radius:10px; box-shadow:0 2px 8px rgba(0,0,0,.08);"></div>
                                     </div>
                                 <?php endif; ?>
+                                <div class="col-md-4">
+                                    <label class="form-label">Date de livraison</label>
+                                    <input class="form-control" type="date" name="delivery_date" id="delivery_date" <?= $hasDeliveryDate ? '' : 'disabled' ?> />
+                                    <?php if (!$hasDeliveryDate): ?><div class="small text-warning">Colonne delivery_date manquante (migration requise).</div><?php endif; ?>
+                                </div>
                                 <div class="col-12">
                                     <label class="form-label">Détails de livraison</label>
                                     <textarea class="form-control" name="delivery_details" id="delivery_details" rows="2" <?= $hasDeliveryDetails ? '' : 'disabled' ?>></textarea>
                                 </div>
-                                <?php if (!$hasDeliveryAddress || !$hasDeliveryLat || !$hasDeliveryLng || !$hasDeliveryDetails || !$hasDeliveryMode): ?>
-                                    <div class="col-12 small text-info">Pour activer pleinement la livraison, exécutez la migration: <a href="<?= BASE_URL ?>/migrations/alter_ventes_add_delivery.php" target="_blank">ajouter les colonnes livraison</a>.</div>
+                                <?php if (!$hasDeliveryAddress || !$hasDeliveryLat || !$hasDeliveryLng || !$hasDeliveryDetails || !$hasDeliveryMode || !$hasDeliveryDate): ?>
+                                    <div class="col-12 small text-info">Pour activer pleinement la livraison, exécutez les migrations: <a href="<?= BASE_URL ?>/migrations/alter_ventes_add_delivery.php" target="_blank">colonnes livraison</a> et <a href="<?= BASE_URL ?>/migrations/alter_ventes_add_delivery_date.php" target="_blank">date de livraison</a>.</div>
                                 <?php endif; ?>
                             </div>
                             <hr />

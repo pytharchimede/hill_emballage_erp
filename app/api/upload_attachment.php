@@ -29,7 +29,15 @@ if (!$entity || $entityId <= 0 || !isset($_FILES['file'])) {
 }
 
 $perm = $permMap[$entity] ?? null;
-if ($perm && !hasPermission($perm)) {
+// Cas particulier: permettre au livreur (deliveries_update) d'ajouter des pièces sur ventes
+if ($entity === 'ventes') {
+    $allowed = hasPermission('sales_update') || hasPermission('deliveries_update');
+    if (!$allowed) {
+        setFlashMessage('warning', "Vous n'avez pas le droit d'ajouter des pièces jointes sur ventes.");
+        header('Location: ' . $redirect);
+        exit;
+    }
+} elseif ($perm && !hasPermission($perm)) {
     setFlashMessage('warning', "Vous n'avez pas le droit d'ajouter des pièces jointes sur $entity.");
     header('Location: ' . $redirect);
     exit;

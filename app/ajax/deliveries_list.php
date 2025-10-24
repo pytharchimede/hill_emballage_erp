@@ -34,6 +34,7 @@ $hasDepotId = colExistsAjax($db, 'ventes', 'depot_id');
 $hasLat = colExistsAjax($db, 'ventes', 'delivery_latitude');
 $hasLng = colExistsAjax($db, 'ventes', 'delivery_longitude');
 $hasAddr = colExistsAjax($db, 'ventes', 'delivery_address');
+$hasDelivDate = colExistsAjax($db, 'ventes', 'delivery_date');
 
 $where = [];
 $params = [];
@@ -48,7 +49,11 @@ if ($hasLivreurId) {
 if ($scope === 'pending') {
     $where[] = "v.statut = 'validee'";
 } elseif ($scope === 'today') {
-    $where[] = 'DATE(v.created_at) = CURDATE()';
+    if ($hasDelivDate) {
+        $where[] = 'v.delivery_date = CURDATE()';
+    } else {
+        $where[] = 'DATE(v.created_at) = CURDATE()';
+    }
     $where[] = "v.statut IN ('validee','livree')";
 }
 // 'all' no extra filter
@@ -56,6 +61,7 @@ if ($scope === 'pending') {
 $whereSql = $where ? ('WHERE ' . implode(' AND ', $where)) : '';
 
 $select = "SELECT v.id, v.numero_vente, v.statut, v.created_at, v.updated_at, v.montant_total,
+                  " . ($hasDelivDate ? 'v.delivery_date' : 'NULL') . " as delivery_date,
                   " . ($hasAddr ? 'v.delivery_address' : 'NULL') . " as delivery_address,
                   " . ($hasLat ? 'v.delivery_latitude' : 'NULL') . " as lat,
                   " . ($hasLng ? 'v.delivery_longitude' : 'NULL') . " as lon,

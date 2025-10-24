@@ -19,6 +19,7 @@
   const dlSigClear = document.getElementById("dl_sig_clear");
   const dlSigSave = document.getElementById("dl_sig_save");
   const dlConfirm = document.getElementById("dl_confirm_btn");
+  const dlPrint = document.getElementById("dl_print_btn");
 
   // Leaflet map globals
   let map = null;
@@ -261,6 +262,32 @@
       } catch (e) {
         alert("Erreur de confirmation.");
       }
+    });
+  }
+
+  if (dlPrint) {
+    dlPrint.addEventListener("click", (e) => {
+      e.preventDefault();
+      try {
+        const html = `<!doctype html><html><head><meta charset="utf-8"><title>Fiche de livraison</title>
+        <style>body{font-family:Arial,sans-serif;padding:20px;} h1{font-size:20px;margin:0 0 10px;} .box{border:1px solid #ddd;border-radius:8px;padding:10px;margin-bottom:10px}</style></head><body>
+        <h1>Fiche de livraison</h1>
+        <div class="box"><strong>Commande:</strong> ${
+          dlNumero?.textContent || ""
+        }<br/>
+        <strong>Client:</strong> ${dlClient?.textContent || ""}<br/>
+        <strong>Adresse:</strong> ${dlAdresse?.textContent || ""}<br/>
+        <strong>Montant:</strong> ${dlMontant?.textContent || ""} FCFA</div>
+        <div class="box"><em>La signature et les photos jointes sont enregistrées dans le système.</em></div>
+        </body></html>`;
+        const w = window.open("", "_blank");
+        if (!w) return;
+        w.document.write(html);
+        w.document.close();
+        w.focus();
+        w.print();
+        setTimeout(() => w.close(), 200);
+      } catch {}
     });
   }
 
