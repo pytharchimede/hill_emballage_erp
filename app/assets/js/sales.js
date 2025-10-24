@@ -38,18 +38,20 @@
     );
   }
 
+  let rowSeq = 0;
   function addItemRow() {
     if (!itemsTable) return;
     const tbody = itemsTable.querySelector("tbody");
+    const idx = rowSeq++;
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>
         <select class="form-select prod">
           ${optionList()}
         </select>
-        <input type="hidden" name="items[][product_id]" class="hid-prod" />
-        <input type="hidden" name="items[][price]" class="hid-price" />
-        <input type="hidden" name="items[][qty]" class="hid-qty" />
+        <input type="hidden" name="items[${idx}][product_id]" class="hid-prod" />
+        <input type="hidden" name="items[${idx}][price]" class="hid-price" />
+        <input type="hidden" name="items[${idx}][qty]" class="hid-qty" />
       </td>
       <td><input class="form-control price" type="number" step="0.01" value="0"/></td>
       <td><input class="form-control qty" type="number" step="0.01" value="1"/></td>
