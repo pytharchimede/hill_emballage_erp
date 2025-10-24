@@ -5,12 +5,47 @@ if (!isLoggedIn() || !hasPermission('clients_read')) {
     exit('Accès refusé');
 }
 $search = $_GET['search'] ?? '';
+$affect = $_GET['affect'] ?? 'all';
+$livreurFilter = isset($_GET['livreur']) ? (int)$_GET['livreur'] : 0;
 $w = 'WHERE 1=1';
 $p = [];
 if ($search) {
     $w .= ' AND (c.nom LIKE ? OR c.email LIKE ? OR c.telephone LIKE ? OR c.entreprise LIKE ?)';
     $q = "%$search%";
     $p = [$q, $q, $q, $q];
+}
+// Détection colonnes
+$hasClientLivreur = (bool)$db->query("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME='clients' AND COLUMN_NAME='livreur_id'")->fetchColumn();
+$hasClientDepot = (bool)$db->query("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME='clients' AND COLUMN_NAME='depot_id'")->fetchColumn();
+
+// Filtre 'Sans livreur'
+if ($affect === 'none' && $hasClientLivreur) {
+    $w .= ' AND c.livreur_id IS NULL';
+}
+// Filtre par livreur précis
+if ($livreurFilter > 0 && $hasClientLivreur) {
+    $w .= ' AND c.livreur_id = ?';
+    $p[] = $livreurFilter;
+}
+
+// Scoping vendeur: restreindre aux clients du dépôt via livreurs du dépôt, sinon colonne depot_id
+$userRole = $_SESSION['user_role'] ?? '';
+if ($userRole === 'vendeur') {
+    $depotId = (int)($_SESSION['depot_id'] ?? 0);
+    if ($depotId > 0) {
+        if ($hasClientLivreur) {
+            if ($hasClientDepot) {
+                $w .= ' AND (c.livreur_id IN (SELECT id FROM users WHERE depot_id = ?) OR (c.livreur_id IS NULL AND c.depot_id = ?))';
+                array_push($p, $depotId, $depotId);
+            } else {
+                $w .= ' AND (c.livreur_id IN (SELECT id FROM users WHERE depot_id = ?) OR c.livreur_id IS NULL)';
+                $p[] = $depotId;
+            }
+        } elseif ($hasClientDepot) {
+            $w .= ' AND c.depot_id = ?';
+            $p[] = $depotId;
+        }
+    }
 }
 $st = $db->prepare("SELECT c.* FROM clients c $w ORDER BY c.created_at DESC");
 $st->execute($p);

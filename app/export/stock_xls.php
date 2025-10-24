@@ -10,6 +10,14 @@ $tdepot = (int)($_GET['tdepot'] ?? 0);
 $tprod = trim($_GET['tprod'] ?? '');
 $tw = 'WHERE 1=1';
 $tp = [];
+// Scoping vendeur: forcer le dépôt
+$userRole = $_SESSION['user_role'] ?? '';
+if ($userRole === 'vendeur') {
+    $depotId = (int)($_SESSION['depot_id'] ?? 0);
+    if ($depotId > 0) {
+        $tdepot = $depotId;
+    }
+}
 if ($td1) {
     $tw .= ' AND st.date_transfer>=?';
     $tp[] = $td1;
@@ -28,7 +36,7 @@ if ($tprod !== '') {
     array_push($tp, $like, $like);
 }
 $stmt = $db->prepare("SELECT st.*, p.nom as produit_nom, ds.nom as depot_src, dd.nom as depot_dst, u.full_name as user_nom
-FROM stock_transfers st JOIN produits p ON st.produit_id=p.id JOIN depots ds ON st.depot_source=ds.id JOIN depots dd ON st.depot_destination=dd.id JOIN users u ON st.user_id=u.id $tw ORDER BY st.date_transfer DESC");
+FROM stock_transfers st JOIN products p ON st.produit_id=p.id JOIN depots ds ON st.depot_source=ds.id JOIN depots dd ON st.depot_destination=dd.id JOIN users u ON st.user_id=u.id $tw ORDER BY st.date_transfer DESC");
 $stmt->execute($tp);
 $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 log_action('EXPORT_XLS', 'stock');

@@ -40,6 +40,33 @@ if ($d2) {
     $params[] = $d2;
 }
 
+// Scoping vendeur par users.depot_id
+$userRole = $_SESSION['user_role'] ?? '';
+if ($userRole === 'vendeur') {
+    $depotId = (int)($_SESSION['depot_id'] ?? 0);
+    if ($depotId > 0) {
+        $hasVenteDepot   = (bool)$db->query("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME='ventes' AND COLUMN_NAME='depot_id'")->fetchColumn();
+        $hasVenteLivreur = (bool)$db->query("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME='ventes' AND COLUMN_NAME='livreur_id'")->fetchColumn();
+        $hasVenteUser    = (bool)$db->query("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME='ventes' AND COLUMN_NAME='user_id'")->fetchColumn();
+        $hasVenteClient  = (bool)$db->query("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME='ventes' AND COLUMN_NAME='client_id'")->fetchColumn();
+        $hasClientDepot  = (bool)$db->query("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME='clients' AND COLUMN_NAME='depot_id'")->fetchColumn();
+
+        if ($hasVenteDepot) {
+            $where .= ' AND v.depot_id = ?';
+            $params[] = $depotId;
+        } elseif ($hasVenteLivreur) {
+            $where .= ' AND v.livreur_id IN (SELECT id FROM users WHERE depot_id = ?)';
+            $params[] = $depotId;
+        } elseif ($hasVenteUser) {
+            $where .= ' AND v.user_id IN (SELECT id FROM users WHERE depot_id = ?)';
+            $params[] = $depotId;
+        } elseif ($hasVenteClient && $hasClientDepot) {
+            $where .= ' AND c.depot_id = ?';
+            $params[] = $depotId;
+        }
+    }
+}
+
 $sql = "SELECT v.numero_vente, v.date_vente, c.nom as client_nom, v.type_vente, v.statut, v.montant_total, v.montant_paye, (v.montant_total - v.montant_paye) as restant
         FROM ventes v LEFT JOIN clients c ON v.client_id=c.id $where ORDER BY v.created_at DESC";
 $st = $db->prepare($sql);

@@ -33,6 +33,31 @@ if ($d2) {
     $w .= ' AND v.date_vente<=?';
     $p[] = $d2;
 }
+// Scoping vendeur par users.depot_id
+$userRole = $_SESSION['user_role'] ?? '';
+if ($userRole === 'vendeur') {
+    $depotId = (int)($_SESSION['depot_id'] ?? 0);
+    if ($depotId > 0) {
+        $hasVenteDepot   = (bool)$db->query("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME='ventes' AND COLUMN_NAME='depot_id'")->fetchColumn();
+        $hasVenteLivreur = (bool)$db->query("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME='ventes' AND COLUMN_NAME='livreur_id'")->fetchColumn();
+        $hasVenteUser    = (bool)$db->query("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME='ventes' AND COLUMN_NAME='user_id'")->fetchColumn();
+        $hasVenteClient  = (bool)$db->query("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME='ventes' AND COLUMN_NAME='client_id'")->fetchColumn();
+        $hasClientDepot  = (bool)$db->query("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME='clients' AND COLUMN_NAME='depot_id'")->fetchColumn();
+        if ($hasVenteDepot) {
+            $w .= ' AND v.depot_id = ?';
+            $p[] = $depotId;
+        } elseif ($hasVenteLivreur) {
+            $w .= ' AND v.livreur_id IN (SELECT id FROM users WHERE depot_id = ?)';
+            $p[] = $depotId;
+        } elseif ($hasVenteUser) {
+            $w .= ' AND v.user_id IN (SELECT id FROM users WHERE depot_id = ?)';
+            $p[] = $depotId;
+        } elseif ($hasVenteClient && $hasClientDepot) {
+            $w .= ' AND c.depot_id = ?';
+            $p[] = $depotId;
+        }
+    }
+}
 $st = $db->prepare("SELECT v.*, c.nom as client_nom FROM ventes v LEFT JOIN clients c ON v.client_id=c.id $w ORDER BY v.created_at DESC");
 $st->execute($p);
 $rows = $st->fetchAll(PDO::FETCH_ASSOC);
