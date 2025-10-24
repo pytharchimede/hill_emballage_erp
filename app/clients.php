@@ -201,7 +201,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    if ($action === 'bulk_assign' && hasPermission('clients_update')) {
+    $bulkAction = $_POST['bulk_action'] ?? '';
+    if ((($action === 'bulk_assign') || ($bulkAction === 'bulk_assign')) && hasPermission('clients_update')) {
         try {
             if (!columnExists($db, 'clients', 'livreur_id')) {
                 throw new Exception("Fonctionnalité non disponible: colonne 'livreur_id' absente");
@@ -377,36 +378,14 @@ include 'includes/header.php';
     <!-- Filtres et recherche -->
     <div class="filters-section">
         <form method="GET" class="filters-form">
-            <div class="filter-group">
-                <input type="text" name="search" placeholder="Rechercher un client..."
+            <div class="filter-group" style="min-width:280px;flex:2">
+                <label for="filter" class="form-label">Saisissez votre requête</label>
+                <input type="text" name="search" placeholder="Rechercher un client (nom, email, téléphone, entreprise)"
                     value="<?= htmlspecialchars($search) ?>" class="form-control search-input">
             </div>
 
-            <div class="filter-group">
-                <select name="filter" class="form-select filter-select">
-                    <option value="all" <?= $filter === 'all' ? 'selected' : '' ?>>Tous les types</option>
-                    <option value="particulier" <?= $filter === 'particulier' ? 'selected' : '' ?>>Particuliers</option>
-                    <option value="entreprise" <?= $filter === 'entreprise' ? 'selected' : '' ?>>Entreprise</option>
-                    <option value="revendeur" <?= $filter === 'revendeur' ? 'selected' : '' ?>>Revendeurs</option>
-                </select>
-            </div>
-
-            <button type="submit" class="btn btn-secondary">
-                <i class="fas fa-search"></i> Rechercher
-            </button>
-
-            <a href="clients.php" class="btn btn-outline">
-                <i class="fas fa-times"></i> Reset
-            </a>
-
-            <a class="btn" href="<?= BASE_URL ?>/app/export/clients_xls.php?search=<?= urlencode($search) ?>">
-                <i class="fas fa-file-excel"></i> Export XLS
-            </a>
-            <a class="btn" href="<?= BASE_URL ?>/app/export/clients_pdf.php?search=<?= urlencode($search) ?>">
-                <i class="fas fa-file-pdf"></i> Export PDF
-            </a>
             <?php if (columnExists($db, 'clients', 'livreur_id') && in_array($userRole, ['admin', 'vendeur'], true)): ?>
-                <div class="filter-group">
+                <div class="filter-group" style="min-width:220px">
                     <label for="affect" class="form-label">Affectation</label>
                     <select name="affect" id="affect" class="form-select filter-select">
                         <option value="all" <?= $affect === 'all' ? 'selected' : '' ?>>Tous (affectés + sans)</option>
@@ -414,6 +393,31 @@ include 'includes/header.php';
                     </select>
                 </div>
             <?php endif; ?>
+
+            <div class="filter-group" style="min-width:220px">
+                <label for="filter" class="form-label">Type</label>
+                <select id="filter" name="filter" class="form-select filter-select">
+                    <option value="all" <?= $filter === 'all' ? 'selected' : '' ?>>Tous les types</option>
+                    <option value="particulier" <?= $filter === 'particulier' ? 'selected' : '' ?>>Particuliers</option>
+                    <option value="entreprise" <?= $filter === 'entreprise' ? 'selected' : '' ?>>Entreprise</option>
+                    <option value="revendeur" <?= $filter === 'revendeur' ? 'selected' : '' ?>>Revendeurs</option>
+                </select>
+            </div>
+
+            <div class="filters-actions" style="display:flex; gap:.5rem; margin-left:auto; align-items:center; flex-wrap:wrap">
+                <button type="submit" class="btn btn-secondary">
+                    <i class="fas fa-search"></i> Rechercher
+                </button>
+                <a href="clients.php" class="btn btn-outline">
+                    <i class="fas fa-times"></i> Reset
+                </a>
+                <a class="btn" href="<?= BASE_URL ?>/app/export/clients_xls.php?search=<?= urlencode($search) ?>">
+                    <i class="fas fa-file-excel"></i> Export XLS
+                </a>
+                <a class="btn" href="<?= BASE_URL ?>/app/export/clients_pdf.php?search=<?= urlencode($search) ?>">
+                    <i class="fas fa-file-pdf"></i> Export PDF
+                </a>
+            </div>
         </form>
     </div>
 
@@ -429,7 +433,7 @@ include 'includes/header.php';
     <?php $canBulk = hasPermission('clients_update') && columnExists($db, 'clients', 'livreur_id') && in_array($userRole, ['admin', 'vendeur'], true); ?>
     <?php if ($canBulk): ?>
         <form method="POST" class="clients-table-container" id="bulkAssignForm">
-            <input type="hidden" name="action" value="bulk_assign" />
+            <input type="hidden" name="bulk_action" value="bulk_assign" />
             <div class="d-flex align-items-center justify-content-end gap-2 p-2">
                 <label for="bulk_livreur" class="me-2">Affecter la sélection à :</label>
                 <select id="bulk_livreur" name="livreur_id" class="form-select" style="max-width: 320px">
@@ -454,7 +458,7 @@ include 'includes/header.php';
                         <option value="<?= (int)$u['id'] ?>"><?= htmlspecialchars($u['full_name']) ?></option>
                     <?php endforeach; ?>
                 </select>
-                <button class="btn btn-primary" type="submit"><i class="fas fa-user-check"></i> Affecter</button>
+                <button class="btn btn-primary" type="submit" name="bulk_submit" value="1"><i class="fas fa-user-check"></i> Affecter</button>
             </div>
         <?php else: ?>
             <div class="clients-table-container">
