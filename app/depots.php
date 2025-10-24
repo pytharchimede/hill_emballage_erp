@@ -47,6 +47,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $lat = $hasLat && $_POST['latitude'] !== '' ? floatval($_POST['latitude']) : null;
             $lng = $hasLng && $_POST['longitude'] !== '' ? floatval($_POST['longitude']) : null;
 
+            // Validation coordonnées: si une adresse est fournie mais pas de lat/lon, prévenir et ne pas enregistrer
+            if ($hasLat && $hasLng && $adresse !== '' && ($lat === null || $lng === null)) {
+                throw new Exception("Veuillez sélectionner une adresse dans la liste pour géolocaliser le dépôt (coordonnées manquantes).");
+            }
+
             $cols = ['nom', 'adresse', 'responsable', 'telephone'];
             $vals = [$nom, $adresse, $responsable, $telephone];
             if ($hasEmail) {
@@ -88,6 +93,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $horaires = $hasHoraires ? trim($_POST['horaires'] ?? '') : null;
             $lat = $hasLat && $_POST['latitude'] !== '' ? floatval($_POST['latitude']) : null;
             $lng = $hasLng && $_POST['longitude'] !== '' ? floatval($_POST['longitude']) : null;
+
+            // Validation coordonnées: si une adresse est fournie mais pas de lat/lon, prévenir et ne pas enregistrer
+            if ($hasLat && $hasLng && $adresse !== '' && ($lat === null || $lng === null)) {
+                throw new Exception("Veuillez sélectionner une adresse dans la liste pour géolocaliser le dépôt (coordonnées manquantes).");
+            }
 
             $sets = ['nom=?', 'adresse=?', 'responsable=?', 'telephone=?'];
             $vals = [$nom, $adresse, $responsable, $telephone];
@@ -168,7 +178,7 @@ include 'includes/header.php';
         <div class="breadcrumb">Administration / Dépôts</div>
     </div>
     <div class="d-flex gap-2">
-        <a class="btn" href="<?= BASE_URL ?>/web_admin/depots_map.php"><i class="fas fa-map-location-dot"></i> Voir la carte</a>
+        <a class="btn" href="<?= BASE_URL ?>/app/depots_map.php"><i class="fas fa-map-location-dot"></i> Voir la carte</a>
         <?php if (hasPermission('depots_create')): ?>
             <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addDepotModal"><i class="fas fa-plus"></i> Nouveau dépôt</button>
         <?php endif; ?>
@@ -185,7 +195,7 @@ include 'includes/header.php';
     <form method="get" class="row g-2">
         <div class="col-md-8"><input class="form-control" type="text" name="search" placeholder="Rechercher (nom/adresse/responsable/téléphone)" value="<?= htmlspecialchars($search) ?>" /></div>
         <div class="col-md-2"><button class="btn w-100" type="submit"><i class="fas fa-search"></i> Rechercher</button></div>
-        <div class="col-md-2"><a class="btn w-100" href="<?= BASE_URL ?>/web_admin/depots_map.php">Carte</a></div>
+        <div class="col-md-2"><a class="btn w-100" href="<?= BASE_URL ?>/app/depots_map.php">Carte</a></div>
     </form>
 
     <table class="table" style="margin-top:1rem;">
@@ -212,9 +222,9 @@ include 'includes/header.php';
                     <?php if ($hasLat && $hasLng): ?>
                         <td>
                             <?php if (!empty($d['latitude']) && !empty($d['longitude'])): ?>
-                                <?= htmlspecialchars($d['latitude']) ?>, <?= htmlspecialchars($d['longitude']) ?>
+                                <span class="badge bg-success-subtle text-success"><i class="fas fa-location-dot"></i> <?= htmlspecialchars($d['latitude']) ?>, <?= htmlspecialchars($d['longitude']) ?></span>
                             <?php else: ?>
-                                <span class="text-warning">Non défini</span>
+                                <span class="badge bg-warning text-dark"><i class="fas fa-triangle-exclamation"></i> Non géolocalisé</span>
                             <?php endif; ?>
                         </td>
                     <?php endif; ?>
@@ -317,7 +327,7 @@ include 'includes/header.php';
                 <div class="modal-header">
                     <h5 class="modal-title"><i class="fas fa-edit"></i> Modifier un dépôt</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>div>
+                </div>
                 <form method="post">
                     <input type="hidden" name="action" value="update" />
                     <input type="hidden" name="id" id="edit_id" />
@@ -352,11 +362,12 @@ include 'includes/header.php';
                 </form>
             </div>
         </div>
-    <?php endif; ?>
+    </div>
+<?php endif; ?>
 
-    <!-- Carte & Autocomplete: assets globaux pour création/édition (CSP-friendly) -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" crossorigin="anonymous" />
-    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js" crossorigin="anonymous"></script>
-    <script src="<?= ASSETS_URL ?>/js/depots_geo.js"></script>
+<!-- Carte & Autocomplete: assets globaux pour création/édition (CSP-friendly) -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" crossorigin="anonymous" />
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js" crossorigin="anonymous"></script>
+<script src="<?= ASSETS_URL ?>/js/depots_geo.js"></script>
 
-    <?php include 'includes/footer.php'; ?>
+<?php include 'includes/footer.php'; ?>

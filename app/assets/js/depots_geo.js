@@ -121,12 +121,39 @@
         }
         const data = await res.json();
         showItems(data);
+        // Aperçu en temps réel: positionner le marqueur sur le 1er résultat et remplir lat/lon
+        const qNow = input.value.trim();
+        if (Array.isArray(data) && data.length && qNow === q) {
+          const first = data[0];
+          const la = parseFloat(first.lat),
+            lo = parseFloat(first.lon);
+          if (!isNaN(la) && !isNaN(lo)) {
+            if (latEl && lonEl) {
+              latEl.value = la.toFixed(6);
+              lonEl.value = lo.toFixed(6);
+            }
+            if (mapCtl && mapCtl.init) mapCtl.init();
+            if (mapCtl && mapCtl.marker && mapCtl.map) {
+              mapCtl.marker.setLatLng([la, lo]);
+              mapCtl.map.setView([la, lo], 15);
+            }
+          }
+        }
       } catch {
         clearList();
       }
-    }, 350);
+    }, 400);
 
     input.addEventListener("input", doSearch);
+    // Enter = sélectionner la première suggestion s'il y en a
+    input.addEventListener("keydown", (ev) => {
+      if (ev.key !== "Enter") return;
+      const first = list.querySelector(".list-group-item");
+      if (first) {
+        ev.preventDefault();
+        first.click();
+      }
+    });
     input.addEventListener("blur", () => setTimeout(clearList, 200));
   }
 
@@ -210,4 +237,47 @@
     editMapCtl
   );
   setupLocate("edit_locate_btn", "edit_latitude", "edit_longitude", editMapCtl);
+
+  // Validation soumission: si une adresse est saisie mais sans lat/lon, on bloque et on affiche un message
+  function attachGeoValidation(modalId, addressId, latId, lonId) {
+    const modal = document.getElementById(modalId);
+    if (!modal) return;
+    const form = modal.querySelector("form");
+    if (!form) return;
+    form.addEventListener("submit", function (ev) {
+      const addr = document.getElementById(addressId);
+      const latEl = document.getElementById(latId);
+      const lonEl = document.getElementById(lonId);
+      if (!addr || !latEl || !lonEl) return; // pas de géo activée => pas de validation
+      const needsGeo = addr.value.trim() !== "";
+      const hasGeo = latEl.value.trim() !== "" && lonEl.value.trim() !== "";
+      if (needsGeo && !hasGeo) {
+        ev.preventDefault();
+        // Afficher une alerte dans le corps du modal
+        const body = modal.querySelector(".modal-body");
+        if (!body) return;
+        // retirer alerte précédente
+        const prev = body.querySelector(".geo-alert");
+        if (prev) prev.remove();
+        const alert = document.createElement("div");
+        alert.className = "alert alert-warning geo-alert";
+        alert.textContent =
+          "Veuillez sélectionner une adresse dans la liste pour géolocaliser le dépôt (coordonnées manquantes).";
+        body.prepend(alert);
+      }
+    });
+  }
+
+  attachGeoValidation(
+    "addDepotModal",
+    "create_adresse",
+    "create_latitude",
+    "create_longitude"
+  );
+  attachGeoValidation(
+    "editDepotModal",
+    "edit_adresse",
+    "edit_latitude",
+    "edit_longitude"
+  );
 })();
