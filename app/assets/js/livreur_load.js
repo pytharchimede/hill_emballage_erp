@@ -13,34 +13,47 @@
     row.className = "col-12";
     row.innerHTML = `
       <div class="row g-2 align-items-end" data-row>
-        <div class="col-md-4">
+        <div class="col-md-5">
           <label class="form-label">Produit</label>
-          <input class="form-control" name="p_${idx}_id" required placeholder="ID produit" />
+          <select class="form-select" name="p_${idx}_prod" data-prod-select required></select>
         </div>
         <div class="col-md-3">
           <label class="form-label">Quantité</label>
-          <input class="form-control" name="p_${idx}_q" type="number" step="0.01" required />
+          <input class="form-control" name="p_${idx}_q" data-qty-input type="number" step="0.01" required />
         </div>
         <div class="col-md-3">
-          <label class="form-label">Client (ID)</label>
-          <input class="form-control" name="p_${idx}_client" list="clients_datalist" placeholder="ID client" />
+          <label class="form-label">Client</label>
+          <select class="form-select" name="p_${idx}_client" data-client-select>
+            <option value="">— Sans client —</option>
+          </select>
         </div>
-        <div class="col-md-2">
+        <div class="col-md-1">
           <button class="btn btn-danger" type="button" data-remove>&times;</button>
         </div>
       </div>`;
     itemsArea.appendChild(row);
+    // Peupler les options depuis le cache caché
+    const prodSelect = row.querySelector("[data-prod-select]");
+    const clientSelect = row.querySelector("[data-client-select]");
+    const prodCache = document.getElementById("product_options");
+    const clientCache = document.getElementById("client_options");
+    if (prodSelect && prodCache) {
+      prodSelect.innerHTML = prodCache.innerHTML;
+    }
+    if (clientSelect && clientCache) {
+      // garder l'option vide puis concaténer les options clients
+      const empty = clientSelect.innerHTML;
+      clientSelect.innerHTML = empty + clientCache.innerHTML;
+    }
   }
 
   function collectItems() {
     const rows = [...itemsArea.querySelectorAll("[data-row]")];
     const items = [];
     for (const r of rows) {
-      const pid = (r.querySelector('input[name$="_id"]')?.value || "").trim();
-      const q = (r.querySelector('input[name$="_q"]')?.value || "").trim();
-      const cid = (
-        r.querySelector('input[name$="_client"]')?.value || ""
-      ).trim();
+      const pid = (r.querySelector("[data-prod-select]")?.value || "").trim();
+      const q = (r.querySelector("[data-qty-input]")?.value || "").trim();
+      const cid = (r.querySelector("[data-client-select]")?.value || "").trim();
       if (pid && q) {
         const it = {
           produit_id: parseInt(pid, 10),

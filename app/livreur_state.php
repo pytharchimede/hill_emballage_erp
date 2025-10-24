@@ -354,14 +354,32 @@ include 'includes/header.php';
         <hr />
         <h3>Enregistrer un panier</h3>
         <?php
-        // Préparer une datalist clients pour l'autocomplete
-        $clientsList = $db->query("SELECT id, nom FROM clients WHERE is_active=1 ORDER BY nom")->fetchAll(PDO::FETCH_ASSOC);
+        // Préparer les listes de sélection (produits, clients)
+        try {
+            $productsList = $db->query("SELECT id, nom FROM products ORDER BY nom")->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Exception $e) {
+            $productsList = [];
+        }
+        try {
+            $clientsList = $db->query("SELECT id, nom FROM clients ORDER BY nom")->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Exception $e) {
+            $clientsList = [];
+        }
         ?>
-        <datalist id="clients_datalist">
-            <?php foreach ($clientsList as $cl): ?>
-                <option value="<?= (int)$cl['id'] ?>"><?= htmlspecialchars($cl['nom']) ?></option>
-            <?php endforeach; ?>
-        </datalist>
+        <div id="options_cache" class="d-none">
+            <select id="product_options">
+                <option value="">— Sélectionner produit —</option>
+                <?php foreach ($productsList as $p): ?>
+                    <option value="<?= (int)$p['id'] ?>"><?= htmlspecialchars($p['nom']) ?></option>
+                <?php endforeach; ?>
+            </select>
+            <select id="client_options">
+                <option value="">— Sélectionner client —</option>
+                <?php foreach ($clientsList as $cl): ?>
+                    <option value="<?= (int)$cl['id'] ?>"><?= htmlspecialchars($cl['nom']) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
         <form method="post" class="mb-3" id="load-form">
             <input type="hidden" name="action" value="save_load" />
             <input type="hidden" name="items_json" id="items_json" value="[]" />
