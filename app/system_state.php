@@ -12,7 +12,17 @@ ensureLivreurFlowTables($db);
 $selectedDate = $_GET['date'] ?? date('Y-m-d');
 
 // Dépôt principal = celui qui n'est pas destination d'un parent? Si non explicit, on affiche tous les dépôts
-$depots = $db->query("SELECT id, nom FROM depots WHERE is_active=1 ORDER BY nom")->fetchAll(PDO::FETCH_ASSOC);
+// Restreindre pour vendeur/comptable/livreur hors dépôt principal
+$role = $_SESSION['user_role'] ?? '';
+$currentDepotId = (int)($_SESSION['depot_id'] ?? 0);
+$restrictToOwnDepot = in_array($role, ['vendeur', 'comptable', 'livreur'], true) && $currentDepotId > 0 && !isMainDepot($currentDepotId);
+
+$depotsSql = "SELECT id, nom FROM depots WHERE is_active=1";
+if ($restrictToOwnDepot) {
+    $depotsSql .= " AND id = " . (int)$currentDepotId;
+}
+$depotsSql .= " ORDER BY nom";
+$depots = $db->query($depotsSql)->fetchAll(PDO::FETCH_ASSOC);
 
 function scalar(PDO $db, $sql, $p = [])
 {

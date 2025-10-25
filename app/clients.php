@@ -305,6 +305,23 @@ if ($userRole === 'livreur' || $userRole === 'commercial') {
         $whereClause .= " AND c.depot_id = ?";
         $params[] = $depotId;
     }
+} elseif ($userRole === 'comptable') {
+    // Comptable: même règle que vendeur, sauf si dépôt principal (accès global)
+    if ($depotId > 0 && !isMainDepot((int)$depotId)) {
+        if (columnExists($db, 'clients', 'livreur_id')) {
+            if ($hasClientDepot) {
+                $whereClause .= " AND (c.livreur_id IN (SELECT id FROM users WHERE depot_id = ?) OR (c.livreur_id IS NULL AND c.depot_id = ?))";
+                $params[] = $depotId;
+                $params[] = $depotId;
+            } else {
+                $whereClause .= " AND (c.livreur_id IN (SELECT id FROM users WHERE depot_id = ?) OR c.livreur_id IS NULL)";
+                $params[] = $depotId;
+            }
+        } elseif (columnExists($db, 'clients', 'depot_id')) {
+            $whereClause .= " AND c.depot_id = ?";
+            $params[] = $depotId;
+        }
+    }
 } else {
     // Admin: aucune restriction supplémentaire
 }

@@ -27,12 +27,26 @@ if (!in_array($_SESSION['user_role'] ?? '', ['livreur', 'commercial'], true)) {
         }
     } catch (Exception $e) {
     }
+    // Restreindre aux livreurs du dépôt courant pour vendeur/comptable non-principal
+    $role = $_SESSION['user_role'] ?? '';
+    $currentDepotId = (int)($_SESSION['depot_id'] ?? 0);
+    $restrictDepot = in_array($role, ['vendeur', 'comptable'], true) && $currentDepotId > 0 && !isMainDepot($currentDepotId);
     if ($roleCol) {
-        $st = $db->prepare("SELECT id, full_name FROM users WHERE $roleCol IN ('livreur','commercial') ORDER BY full_name");
-        $st->execute();
+        if ($restrictDepot) {
+            $st = $db->prepare("SELECT id, full_name FROM users WHERE $roleCol IN ('livreur','commercial') AND depot_id=? ORDER BY full_name");
+            $st->execute([$currentDepotId]);
+        } else {
+            $st = $db->prepare("SELECT id, full_name FROM users WHERE $roleCol IN ('livreur','commercial') ORDER BY full_name");
+            $st->execute();
+        }
     } else {
-        // Fallback: pas de colonne rôle → ne pas filtrer par rôle
-        $st = $db->query("SELECT id, full_name FROM users ORDER BY full_name");
+        // Fallback: pas de colonne rôle → filtrer éventuellement par dépôt
+        if ($restrictDepot) {
+            $st = $db->prepare("SELECT id, full_name FROM users WHERE depot_id=? ORDER BY full_name");
+            $st->execute([$currentDepotId]);
+        } else {
+            $st = $db->query("SELECT id, full_name FROM users ORDER BY full_name");
+        }
     }
     $livreurs = $st->fetchAll(PDO::FETCH_ASSOC);
 }

@@ -73,21 +73,48 @@ if ($d2) {
     $params[] = $d2;
 }
 
-$countSql = "SELECT COUNT(*) t FROM payments p JOIN ventes v ON p.vente_id=v.id JOIN clients c ON v.client_id=c.id $where";
+$role = $_SESSION['user_role'] ?? '';
+if (in_array($role, ['vendeur', 'comptable', 'livreur'], true)) {
+    $current = getCurrentUser();
+    $depotId = (int)($current['depot_id'] ?? 0);
+    if ($depotId > 0 && !isMainDepot($depotId)) {
+        $where .= ' AND (v.depot_id = ? OR (v.livreur_id IS NOT NULL AND lvr.depot_id = ?) OR (v.user_id IS NOT NULL AND uu.depot_id = ?) OR c.depot_id = ?)';
+        array_push($params, $depotId, $depotId, $depotId, $depotId);
+    }
+}
+
+$countSql = "SELECT COUNT(*) t FROM payments p JOIN ventes v ON p.vente_id=v.id JOIN clients c ON v.client_id=c.id LEFT JOIN users uu ON v.user_id=uu.id LEFT JOIN users lvr ON v.livreur_id=lvr.id $where";
 $cs = $db->prepare($countSql);
 $cs->execute($params);
 $total = (int)($cs->fetch(PDO::FETCH_ASSOC)['t'] ?? 0);
 
 $sql = "SELECT p.*, v.numero_vente, c.nom as client_nom FROM payments p
-        JOIN ventes v ON p.vente_id=v.id JOIN clients c ON v.client_id=c.id
-        $where ORDER BY p.created_at DESC LIMIT $limit OFFSET $offset";
+    JOIN ventes v ON p.vente_id=v.id JOIN clients c ON v.client_id=c.id
+    LEFT JOIN users uu ON v.user_id=uu.id LEFT JOIN users lvr ON v.livreur_id=lvr.id
+    $where ORDER BY p.created_at DESC LIMIT $limit OFFSET $offset";
 $st = $db->prepare($sql);
 $st->execute($params);
 $rows = $st->fetchAll(PDO::FETCH_ASSOC);
 $pages = max(1, (int)ceil($total / $limit));
 
 // ventes ouvertes pour encaissement
-$open = $db->query("SELECT id, numero_vente, (montant_total - montant_paye) as restant FROM ventes WHERE (montant_total - montant_paye) > 0 ORDER BY created_at DESC")->fetchAll(PDO::FETCH_ASSOC);
+$openWhere = 'WHERE (v.montant_total - v.montant_paye) > 0';
+$openParams = [];
+if (in_array($role, ['vendeur', 'comptable', 'livreur'], true)) {
+    $current = $current ?? getCurrentUser();
+    $depotId = (int)($current['depot_id'] ?? 0);
+    if ($depotId > 0 && !isMainDepot($depotId)) {
+        $openWhere .= ' AND (v.depot_id = ? OR (v.livreur_id IS NOT NULL AND lvr.depot_id = ?) OR (v.user_id IS NOT NULL AND uu.depot_id = ?) OR c.depot_id = ?)';
+        array_push($openParams, $depotId, $depotId, $depotId, $depotId);
+    }
+}
+$stOpen = $db->prepare("SELECT v.id, v.numero_vente, (v.montant_total - v.montant_paye) as restant FROM ventes v
+                         LEFT JOIN clients c ON v.client_id=c.id
+                         LEFT JOIN users uu ON v.user_id=uu.id
+                         LEFT JOIN users lvr ON v.livreur_id=lvr.id
+                         $openWhere ORDER BY v.created_at DESC");
+$stOpen->execute($openParams);
+$open = $stOpen->fetchAll(PDO::FETCH_ASSOC);
 
 $pageTitle = 'Paiements';
 log_action('VIEW', 'payments');

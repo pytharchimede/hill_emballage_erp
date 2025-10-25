@@ -112,48 +112,80 @@ try {
         // Filtres d'affectation: priorité au livreur_id si dispo, sinon fallback dépôt
         $filterCol = $hasLivreurId ? 'livreur_id' : 'depot_id';
         $filterVal = $hasLivreurId ? $userId : $depotId;
+        $cond = '1=1';
+        $cParams = [];
+        if (!($depotId && isMainDepot((int)$depotId))) {
+            $cond = "$filterCol = ?";
+            $cParams[] = $filterVal;
+        }
 
         // Livraisons du jour (terminées)
         if ($hasDeliveryDate) {
-            $stats['deliveries_today'] = (int)$scalar("SELECT COUNT(*) FROM ventes WHERE $filterCol = ? AND statut = 'livree' AND delivery_date = CURDATE()" . ($hasDeliveryMode ? " AND delivery_mode='livraison'" : ""), [$filterVal]);
+            $stats['deliveries_today'] = (int)$scalar("SELECT COUNT(*) FROM ventes WHERE $cond AND statut = 'livree' AND delivery_date = CURDATE()" . ($hasDeliveryMode ? " AND delivery_mode='livraison'" : ""), $cParams);
         } else {
-            $stats['deliveries_today'] = (int)$scalar("SELECT COUNT(*) FROM ventes WHERE $filterCol = ? AND statut = 'livree' AND DATE(updated_at) = CURDATE()" . ($hasDeliveryMode ? " AND delivery_mode='livraison'" : ""), [$filterVal]);
+            $stats['deliveries_today'] = (int)$scalar("SELECT COUNT(*) FROM ventes WHERE $cond AND statut = 'livree' AND DATE(updated_at) = CURDATE()" . ($hasDeliveryMode ? " AND delivery_mode='livraison'" : ""), $cParams);
         }
 
         // Livraisons en attente (du jour si possible)
         if ($hasDeliveryDate) {
-            $stats['pending_deliveries'] = (int)$scalar("SELECT COUNT(*) FROM ventes WHERE $filterCol = ? AND statut IN ('en_attente','validee') AND delivery_date = CURDATE()" . ($hasDeliveryMode ? " AND delivery_mode='livraison'" : ""), [$filterVal]);
+            $stats['pending_deliveries'] = (int)$scalar("SELECT COUNT(*) FROM ventes WHERE $cond AND statut IN ('en_attente','validee') AND delivery_date = CURDATE()" . ($hasDeliveryMode ? " AND delivery_mode='livraison'" : ""), $cParams);
         } else {
             // fallback: sans date planifiée, afficher toutes les en_attente/validées
-            $stats['pending_deliveries'] = (int)$scalar("SELECT COUNT(*) FROM ventes WHERE $filterCol = ? AND statut IN ('en_attente','validee')" . ($hasDeliveryMode ? " AND delivery_mode='livraison'" : ""), [$filterVal]);
+            $stats['pending_deliveries'] = (int)$scalar("SELECT COUNT(*) FROM ventes WHERE $cond AND statut IN ('en_attente','validee')" . ($hasDeliveryMode ? " AND delivery_mode='livraison'" : ""), $cParams);
         }
 
         // Livraisons terminées (toutes)
-        $stats['completed_deliveries'] = (int)$scalar("SELECT COUNT(*) FROM ventes WHERE $filterCol = ? AND statut = 'livree'" . ($hasDeliveryMode ? " AND delivery_mode='livraison'" : ""), [$filterVal]);
+        $stats['completed_deliveries'] = (int)$scalar("SELECT COUNT(*) FROM ventes WHERE $cond AND statut = 'livree'" . ($hasDeliveryMode ? " AND delivery_mode='livraison'" : ""), $cParams);
 
         // Clients du dépôt (inchangé)
         $stats['total_clients'] = (int)$scalar("SELECT COUNT(*) FROM clients WHERE depot_id = ? AND is_active = 1", [$depotId]);
     } elseif ($userRole === 'comptable') {
-        // Pour des KPI cohérents avec vos saisies, baser les dates sur DATE(created_at)
+        // Scoping dépôt (sauf dépôt principal)
         $venteDateExpr = 'DATE(created_at)';
+        $depotId = (int)($_SESSION['depot_id'] ?? 0);
+        $hasVenteDepot   = (int)$scalar("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ventes' AND COLUMN_NAME = 'depot_id'") > 0;
+        $hasVenteLivreur = (int)$scalar("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ventes' AND COLUMN_NAME = 'livreur_id'") > 0;
+        $hasVenteUser    = (int)$scalar("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ventes' AND COLUMN_NAME = 'user_id'") > 0;
+        $hasVenteClient  = (int)$scalar("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ventes' AND COLUMN_NAME = 'client_id'") > 0;
+        $hasClientDepot  = (int)$scalar("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'clients' AND COLUMN_NAME = 'depot_id'") > 0;
+
+        $joinClients = false;
+        $scopeSql = '1=1';
+        $scopeParams = [];
+        if ($depotId > 0 && !isMainDepot($depotId)) {
+            if ($hasVenteDepot) {
+                $scopeSql = 'v.depot_id = ?';
+                $scopeParams[] = $depotId;
+            } elseif ($hasVenteLivreur) {
+                $scopeSql = 'v.livreur_id IN (SELECT id FROM users WHERE depot_id = ?)';
+                $scopeParams[] = $depotId;
+            } elseif ($hasVenteUser) {
+                $scopeSql = 'v.user_id IN (SELECT id FROM users WHERE depot_id = ?)';
+                $scopeParams[] = $depotId;
+            } elseif ($hasVenteClient && $hasClientDepot) {
+                $joinClients = true;
+                $scopeSql = 'c.depot_id = ?';
+                $scopeParams[] = $depotId;
+            }
+        }
+
+        $fromV = ' FROM ventes v ' . ($joinClients ? 'LEFT JOIN clients c ON v.client_id = c.id ' : '');
         // Chiffres d'affaires (basés sur ventes créées)
-        $stats['revenue_today']   = (int)$scalar("SELECT COALESCE(SUM(montant_total),0) FROM ventes WHERE $venteDateExpr = CURDATE()");
-        $stats['revenue_month']   = (int)$scalar("SELECT COALESCE(SUM(montant_total),0) FROM ventes WHERE MONTH($venteDateExpr) = MONTH(CURDATE()) AND YEAR($venteDateExpr) = YEAR(CURDATE())");
-        // Paiements (recalibrés pour refléter l'encours réel)
-        // En attente = nombre de ventes avec solde dû (quel que soit l'état des enregistrements payments)
-        $stats['pending_payments'] = (int)$scalar("SELECT COUNT(*) FROM ventes WHERE montant_paye < montant_total");
-        // Reçus (paiements validés)
-        $stats['paid_payments']   = (int)$scalar("SELECT COUNT(*) FROM payments WHERE statut = 'valide'");
-        // Rejetés (anciennement 'retard' inexistant dans les statuts réels)
-        $stats['overdue_payments'] = (int)$scalar("SELECT COUNT(*) FROM payments WHERE statut = 'rejete'");
-        // Montants utiles pour le comptable (basés sur la date de paiement déclarée)
-        $stats['received_today_amount'] = (int)$scalar("SELECT COALESCE(SUM(montant),0) FROM payments WHERE statut='valide' AND date_payment = CURDATE()");
-        $stats['outstanding_total_amount'] = (int)$scalar("SELECT COALESCE(SUM(montant_total - montant_paye),0) FROM ventes WHERE montant_paye < montant_total");
-        $stats['outstanding_today_amount'] = (int)$scalar("SELECT COALESCE(SUM(montant_total - montant_paye),0) FROM ventes WHERE $venteDateExpr = CURDATE() AND montant_paye < montant_total");
-        // Factures du jour = ventes créées aujourd'hui
-        $stats['total_invoices']  = (int)$scalar("SELECT COUNT(*) FROM ventes WHERE $venteDateExpr = CURDATE()");
-        // Factures de reliquat (auto) = ventes avec encours (toutes périodes)
-        $stats['reliquat_invoices'] = (int)$scalar("SELECT COUNT(*) FROM ventes WHERE montant_paye < montant_total");
+        $stats['revenue_today']   = (int)$scalar("SELECT COALESCE(SUM(v.montant_total),0)$fromV WHERE $scopeSql AND $venteDateExpr = CURDATE()", $scopeParams);
+        $stats['revenue_month']   = (int)$scalar("SELECT COALESCE(SUM(v.montant_total),0)$fromV WHERE $scopeSql AND MONTH($venteDateExpr) = MONTH(CURDATE()) AND YEAR($venteDateExpr) = YEAR(CURDATE())", $scopeParams);
+        // En attente = ventes avec solde dû
+        $stats['pending_payments'] = (int)$scalar("SELECT COUNT(*)$fromV WHERE $scopeSql AND v.montant_paye < v.montant_total", $scopeParams);
+
+        // Paiements: joindre ventes pour scoper par dépôt
+        $fromP = ' FROM payments p JOIN ventes v ON p.vente_id=v.id ' . ($joinClients ? 'LEFT JOIN clients c ON v.client_id=c.id ' : '');
+        $stats['paid_payments']     = (int)$scalar("SELECT COUNT(*)$fromP WHERE $scopeSql AND p.statut='valide'", $scopeParams);
+        $stats['overdue_payments']  = (int)$scalar("SELECT COUNT(*)$fromP WHERE $scopeSql AND p.statut='rejete'", $scopeParams);
+        $stats['received_today_amount'] = (int)$scalar("SELECT COALESCE(SUM(p.montant),0)$fromP WHERE $scopeSql AND p.statut='valide' AND p.date_payment = CURDATE()", $scopeParams);
+
+        $stats['outstanding_total_amount'] = (int)$scalar("SELECT COALESCE(SUM(v.montant_total - v.montant_paye),0)$fromV WHERE $scopeSql AND v.montant_paye < v.montant_total", $scopeParams);
+        $stats['outstanding_today_amount'] = (int)$scalar("SELECT COALESCE(SUM(v.montant_total - v.montant_paye),0)$fromV WHERE $scopeSql AND $venteDateExpr = CURDATE() AND v.montant_paye < v.montant_total", $scopeParams);
+        $stats['total_invoices']  = (int)$scalar("SELECT COUNT(*)$fromV WHERE $scopeSql AND $venteDateExpr = CURDATE()", $scopeParams);
+        $stats['reliquat_invoices'] = (int)$scalar("SELECT COUNT(*)$fromV WHERE $scopeSql AND v.montant_paye < v.montant_total", $scopeParams);
     }
 } catch (Exception $e) {
     $stats = [];

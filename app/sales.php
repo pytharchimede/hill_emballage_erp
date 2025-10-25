@@ -210,11 +210,11 @@ if ($d2) {
     $params[] = $d2;
 }
 
-// Scoping Vendeur: restreindre aux ventes déduites du dépôt du vendeur
+// Scoping Vendeur/Comptable: restreindre aux ventes du dépôt (sauf dépôt principal)
 $userRole = $_SESSION['user_role'] ?? '';
-if ($userRole === 'vendeur') {
+if (in_array($userRole, ['vendeur', 'comptable'], true)) {
     $depotId = (int)($_SESSION['depot_id'] ?? 0);
-    if ($depotId > 0) {
+    if ($depotId > 0 && !isMainDepot($depotId)) {
         $hasVenteDepot   = (bool)$db->query("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME='ventes' AND COLUMN_NAME='depot_id'")->fetchColumn();
         $hasVenteLivreur = (bool)$db->query("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME='ventes' AND COLUMN_NAME='livreur_id'")->fetchColumn();
         $hasVenteUser    = (bool)$db->query("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME='ventes' AND COLUMN_NAME='user_id'")->fetchColumn();

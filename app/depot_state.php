@@ -12,7 +12,21 @@ ensureLivreurFlowTables($db);
 $selectedDate = $_GET['date'] ?? date('Y-m-d');
 $depotId = isset($_GET['depot_id']) ? (int)$_GET['depot_id'] : (int)($_SESSION['depot_id'] ?? 0);
 
-$depots = $db->query("SELECT id, nom FROM depots WHERE is_active=1 ORDER BY nom")->fetchAll(PDO::FETCH_ASSOC);
+// Restreindre la liste et la sélection de dépôts pour vendeur/comptable/livreur non principal
+$role = $_SESSION['user_role'] ?? '';
+$currentDepotId = (int)($_SESSION['depot_id'] ?? 0);
+$restrictToOwnDepot = in_array($role, ['vendeur', 'comptable', 'livreur'], true) && $currentDepotId > 0 && !isMainDepot($currentDepotId);
+
+$depotsSql = "SELECT id, nom FROM depots WHERE is_active=1";
+if ($restrictToOwnDepot) {
+    $depotsSql .= " AND id = " . (int)$currentDepotId;
+}
+$depotsSql .= " ORDER BY nom";
+$depots = $db->query($depotsSql)->fetchAll(PDO::FETCH_ASSOC);
+
+if ($restrictToOwnDepot) {
+    $depotId = $currentDepotId; // forcer le filtre
+}
 $livreurs = [];
 if ($depotId) {
     // Détection dynamique de la colonne rôle

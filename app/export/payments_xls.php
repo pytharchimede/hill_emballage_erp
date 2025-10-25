@@ -40,14 +40,15 @@ if ($d2) {
     $params[] = $d2;
 }
 
-$isVendor = (($_SESSION['user_role'] ?? '') === 'vendeur');
-if ($isVendor) {
-    // Restreindre aux données du dépôt du vendeur, en suivant la même priorité que les pages Ventes
+$role = $_SESSION['user_role'] ?? '';
+if (in_array($role, ['vendeur', 'comptable', 'livreur'], true)) {
     $current = getCurrentUser();
     $depotId = (int)($current['depot_id'] ?? 0);
-    // Joindre utilisateurs pour remonter le dépôt via user/livreur si besoin
-    $where .= ' AND (v.depot_id = ? OR (v.livreur_id IS NOT NULL AND lvr.depot_id = ?) OR (v.user_id IS NOT NULL AND uu.depot_id = ?) OR c.depot_id = ?)';
-    array_push($params, $depotId, $depotId, $depotId, $depotId);
+    if ($depotId > 0 && !isMainDepot($depotId)) {
+        // Restreindre aux données du dépôt, en suivant la même priorité que les pages Ventes
+        $where .= ' AND (v.depot_id = ? OR (v.livreur_id IS NOT NULL AND lvr.depot_id = ?) OR (v.user_id IS NOT NULL AND uu.depot_id = ?) OR c.depot_id = ?)';
+        array_push($params, $depotId, $depotId, $depotId, $depotId);
+    }
 }
 
 $sql = "SELECT p.numero_recu, p.date_payment, v.numero_vente, c.nom as client_nom, p.montant, p.mode_payment, p.statut

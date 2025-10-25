@@ -29,11 +29,11 @@ if ($livreurFilter > 0 && $hasClientLivreur) {
     $p[] = $livreurFilter;
 }
 
-// Scoping vendeur
+// Scoping par dépôt pour vendeur/comptable (sauf dépôt principal)
 $userRole = $_SESSION['user_role'] ?? '';
-if ($userRole === 'vendeur') {
+if (in_array($userRole, ['vendeur', 'comptable'], true)) {
     $depotId = (int)($_SESSION['depot_id'] ?? 0);
-    if ($depotId > 0) {
+    if ($depotId > 0 && !isMainDepot($depotId)) {
         if ($hasClientLivreur) {
             if ($hasClientDepot) {
                 $w .= ' AND (c.livreur_id IN (SELECT id FROM users WHERE depot_id = ?) OR (c.livreur_id IS NULL AND c.depot_id = ?))';

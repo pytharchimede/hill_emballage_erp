@@ -61,8 +61,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // Filtres
 $search = $_GET['search'] ?? '';
 $depot = (int)($_GET['depot'] ?? 0);
-// Vendeur: forcer son propre dépôt
-if ($userRole === 'vendeur' && $userDepotId > 0) {
+// Scoping par dépôt: vendeur/comptable/livreur (sauf dépôt principal)
+if (in_array($userRole, ['vendeur', 'comptable', 'livreur'], true) && $userDepotId > 0 && !isMainDepot($userDepotId)) {
     $depot = $userDepotId;
 }
 $page = max(1, (int)($_GET['page'] ?? 1));
@@ -90,8 +90,8 @@ $st->execute($params);
 $rows = $st->fetchAll(PDO::FETCH_ASSOC);
 $pages = max(1, (int)ceil($total / $limit));
 
-// Restreindre la liste des dépôts pour les vendeurs
-if ($userRole === 'vendeur' && $userDepotId > 0) {
+// Restreindre la liste des dépôts pour vendeurs/comptables/livreurs (hors dépôt principal)
+if (in_array($userRole, ['vendeur', 'comptable', 'livreur'], true) && $userDepotId > 0 && !isMainDepot($userDepotId)) {
     $ds = $db->prepare('SELECT id, nom FROM depots WHERE is_active=1 AND id=? ORDER BY nom');
     $ds->execute([$userDepotId]);
     $depots = $ds->fetchAll(PDO::FETCH_ASSOC);
@@ -204,7 +204,7 @@ include 'includes/header.php';
     $td1 = $_GET['td1'] ?? '';
     $td2 = $_GET['td2'] ?? '';
     $tdepot = (int)($_GET['tdepot'] ?? 0);
-    if ($userRole === 'vendeur' && $userDepotId > 0) {
+    if (in_array($userRole, ['vendeur', 'comptable', 'livreur'], true) && $userDepotId > 0 && !isMainDepot($userDepotId)) {
         $tdepot = $userDepotId;
     }
     $tprod = trim($_GET['tprod'] ?? '');

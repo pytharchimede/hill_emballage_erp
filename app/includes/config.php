@@ -90,6 +90,42 @@ function getCurrentUser()
     return $stmt->fetch(PDO::FETCH_ASSOC);
 }
 
+/**
+ * Détermine si un dépôt est le dépôt principal (accès global).
+ * Priorité:
+ * - Si la colonne depots.is_principal existe: utiliser sa valeur (1 = principal)
+ * - Sinon, si depots.is_main existe: utiliser sa valeur
+ * - Sinon, fallback convention: id = 1 est considéré comme principal
+ */
+function isMainDepot($depotId)
+{
+    global $db;
+    try {
+        $depotId = (int)$depotId;
+        if ($depotId <= 0) return false;
+        // Détecter colonne marqueur
+        $col = null;
+        foreach (['is_principal', 'is_main', 'principal'] as $candidate) {
+            $q = $db->prepare("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME='depots' AND COLUMN_NAME=?");
+            $q->execute([$candidate]);
+            if ((int)$q->fetchColumn() > 0) {
+                $col = $candidate;
+                break;
+            }
+        }
+        if ($col) {
+            $s = $db->prepare("SELECT $col FROM depots WHERE id=?");
+            $s->execute([$depotId]);
+            $val = $s->fetch(PDO::FETCH_NUM);
+            if ($val !== false) return ((int)$val[0]) === 1;
+        }
+        // Fallback: considérer id=1 comme principal
+        return $depotId === 1;
+    } catch (Exception $e) {
+        return false;
+    }
+}
+
 function formatMoney($amount)
 {
     return number_format($amount, 0, ',', ' ') . ' FCFA';

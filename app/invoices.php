@@ -34,10 +34,36 @@ if ($search) {
     array_push($params, $q, $q);
 }
 
+// Scoping par dépôt pour vendeur/comptable/livreur (sauf dépôt principal)
+$role = $_SESSION['user_role'] ?? '';
+$currentDepotId = (int)($_SESSION['depot_id'] ?? 0);
+$hasVenteDepot   = colExists($db, 'ventes', 'depot_id');
+$hasVenteLivreur = colExists($db, 'ventes', 'livreur_id');
+$hasVenteUser    = colExists($db, 'ventes', 'user_id');
+$hasVenteClient  = colExists($db, 'ventes', 'client_id');
+$hasClientDepot  = colExists($db, 'clients', 'depot_id');
+
+$scopeSql = '';
+if (in_array($role, ['vendeur', 'comptable', 'livreur'], true) && $currentDepotId > 0 && !isMainDepot($currentDepotId)) {
+    if ($hasVenteDepot) {
+        $scopeSql = 'v.depot_id = ?';
+    } elseif ($hasVenteLivreur) {
+        $scopeSql = 'v.livreur_id IN (SELECT id FROM users WHERE depot_id = ?)';
+    } elseif ($hasVenteUser) {
+        $scopeSql = 'v.user_id IN (SELECT id FROM users WHERE depot_id = ?)';
+    } elseif ($hasVenteClient && $hasClientDepot) {
+        $scopeSql = 'c.depot_id = ?';
+    }
+    if ($scopeSql) {
+        $where .= " AND $scopeSql";
+        $params[] = $currentDepotId;
+    }
+}
+
 // Récupération
 $sql = "SELECT v.id, v.numero_vente, $dateExpr as d, v.montant_total, v.montant_paye, (v.montant_total - v.montant_paye) as restant, v.statut, c.nom as client
-        FROM ventes v JOIN clients c ON v.client_id=c.id
-        $where ORDER BY d DESC, v.id DESC";
+    FROM ventes v JOIN clients c ON v.client_id=c.id
+    $where ORDER BY d DESC, v.id DESC";
 $st = $db->prepare($sql);
 $st->execute($params);
 $rows = $st->fetchAll(PDO::FETCH_ASSOC);
@@ -45,12 +71,18 @@ $rows = $st->fetchAll(PDO::FETCH_ASSOC);
 // Générer automatiquement des "factures de reliquat" pour les autres ventes
 // Règle: ventes avec encours (montant_paye < montant_total) créées sur la période
 // mais dont la facture d'origine n'est pas déjà listée via $dateExpr sur la période.
+$relWhere = "WHERE $createdExpr BETWEEN ? AND ? AND (v.montant_paye < v.montant_total) AND NOT ($dateExpr BETWEEN ? AND ?)";
+// Appliquer le même scope aux reliquats
+if ($scopeSql) {
+    $relWhere .= " AND $scopeSql";
+}
 $stRel = $db->prepare("SELECT v.id, v.numero_vente, $createdExpr as d, v.montant_total, v.montant_paye,
                 (v.montant_total - v.montant_paye) as restant, 'reliquat' as statut, c.nom as client
                 FROM ventes v JOIN clients c ON v.client_id=c.id
-                WHERE $createdExpr BETWEEN ? AND ? AND (v.montant_paye < v.montant_total)
-                    AND NOT ($dateExpr BETWEEN ? AND ?)");
-$stRel->execute([$d1, $d2, $d1, $d2]);
+                $relWhere");
+$relParams = [$d1, $d2, $d1, $d2];
+if ($scopeSql) $relParams[] = $currentDepotId;
+$stRel->execute($relParams);
 $rowsRel = $stRel->fetchAll(PDO::FETCH_ASSOC);
 
 // KPIs simples

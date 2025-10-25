@@ -39,12 +39,15 @@ $hasMode = colExistsAjax($db, 'ventes', 'delivery_mode');
 
 $where = [];
 $params = [];
-if ($hasLivreurId) {
-    $where[] = 'v.livreur_id = ?';
-    $params[] = $userId;
-} elseif ($hasDepotId) {
-    $where[] = 'v.depot_id = ?';
-    $params[] = $depotId;
+// Dépôt principal: pas de restriction globale
+if (!($depotId && isMainDepot($depotId))) {
+    if ($hasLivreurId) {
+        $where[] = 'v.livreur_id = ?';
+        $params[] = $userId;
+    } elseif ($hasDepotId) {
+        $where[] = 'v.depot_id = ?';
+        $params[] = $depotId;
+    }
 }
 
 // Restreindre aux ventes en mode livraison si la colonne existe

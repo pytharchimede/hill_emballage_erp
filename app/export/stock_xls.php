@@ -10,11 +10,11 @@ $tdepot = (int)($_GET['tdepot'] ?? 0);
 $tprod = trim($_GET['tprod'] ?? '');
 $tw = 'WHERE 1=1';
 $tp = [];
-// Scoping vendeur: forcer le dépôt
+// Scoping dépôt: vendeur/comptable/livreur (sauf dépôt principal)
 $userRole = $_SESSION['user_role'] ?? '';
-if ($userRole === 'vendeur') {
+if (in_array($userRole, ['vendeur', 'comptable', 'livreur'], true)) {
     $depotId = (int)($_SESSION['depot_id'] ?? 0);
-    if ($depotId > 0) {
+    if ($depotId > 0 && !isMainDepot($depotId)) {
         $tdepot = $depotId;
     }
 }

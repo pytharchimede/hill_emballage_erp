@@ -33,11 +33,11 @@ if ($d2) {
     $w .= ' AND v.date_vente<=?';
     $p[] = $d2;
 }
-// Scoping vendeur par users.depot_id
+// Scoping par dépôt pour vendeur/comptable/livreur (sauf dépôt principal)
 $userRole = $_SESSION['user_role'] ?? '';
-if ($userRole === 'vendeur') {
+if (in_array($userRole, ['vendeur', 'comptable', 'livreur'], true)) {
     $depotId = (int)($_SESSION['depot_id'] ?? 0);
-    if ($depotId > 0) {
+    if ($depotId > 0 && !isMainDepot($depotId)) {
         $hasVenteDepot   = (bool)$db->query("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME='ventes' AND COLUMN_NAME='depot_id'")->fetchColumn();
         $hasVenteLivreur = (bool)$db->query("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME='ventes' AND COLUMN_NAME='livreur_id'")->fetchColumn();
         $hasVenteUser    = (bool)$db->query("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME='ventes' AND COLUMN_NAME='user_id'")->fetchColumn();
