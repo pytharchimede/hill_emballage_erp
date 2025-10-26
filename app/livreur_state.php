@@ -140,6 +140,92 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             header('Location: ' . $_SERVER['REQUEST_URI']);
             exit();
         }
+        if (($_POST['action'] ?? '') === 'close_tour') {
+            // Clôturer la tournée: calculer le restant (panier validé - ventes du jour), ré-incrémenter le stock, auditer et marquer fermé
+            $role = $_SESSION['user_role'] ?? '';
+            if (!in_array($role, ['vendeur', 'gerant', 'admin', 'comptable'], true)) throw new Exception('Non autorisé à clôturer');
+            // Identifier le load à clôturer
+            $loadId = isset($_POST['load_id']) ? (int)$_POST['load_id'] : 0;
+            if (!$loadId && $livreurId) {
+                $q = $db->prepare("SELECT id FROM livreur_loads WHERE livreur_id=? AND date_load=? ORDER BY id DESC LIMIT 1");
+                $q->execute([$livreurId, $selectedDate]);
+                $row = $q->fetch(PDO::FETCH_ASSOC);
+                if ($row) $loadId = (int)$row['id'];
+            }
+            if (!$loadId) throw new Exception('Aucun panier trouvé pour clôture');
+
+            $db->beginTransaction();
+            // Verrouiller le load et vérifier statut
+            $stLoad = $db->prepare("SELECT id, depot_id, status FROM livreur_loads WHERE id=? FOR UPDATE");
+            $stLoad->execute([$loadId]);
+            $lr = $stLoad->fetch(PDO::FETCH_ASSOC);
+            if (!$lr) throw new Exception('Panier introuvable');
+            $depot_id = (int)$lr['depot_id'];
+            $status = $lr['status'] ?? 'draft';
+            if ($status !== 'validated') throw new Exception('Le panier doit être validé avant clôture');
+
+            // Quantités chargées par produit
+            $loadItemsQ = $db->prepare("SELECT produit_id, SUM(quantite) q FROM livreur_load_items WHERE load_id=? GROUP BY produit_id");
+            $loadItemsQ->execute([$loadId]);
+            $loadMap = [];
+            foreach ($loadItemsQ->fetchAll(PDO::FETCH_ASSOC) as $it) {
+                $loadMap[(int)$it['produit_id']] = (float)$it['q'];
+            }
+
+            // Quantités vendues par produit pour ce livreur et ce jour
+            $soldQ = $db->prepare("SELECT i.produit_id, COALESCE(SUM(i.quantite),0) q
+                                   FROM vente_items i JOIN ventes v ON i.vente_id=v.id
+                                   WHERE v.livreur_id=? AND DATE(v.created_at)=?
+                                   GROUP BY i.produit_id");
+            $soldQ->execute([$livreurId, $selectedDate]);
+            $soldMap = [];
+            foreach ($soldQ->fetchAll(PDO::FETCH_ASSOC) as $s) {
+                $soldMap[(int)$s['produit_id']] = (float)$s['q'];
+            }
+
+            // Calcul du restant par produit (>=0)
+            $returns = [];
+            foreach ($loadMap as $pid => $qLoad) {
+                $qSold = $soldMap[$pid] ?? 0.0;
+                $qRet = $qLoad - $qSold;
+                if ($qRet > 0) {
+                    $returns[$pid] = $qRet;
+                }
+            }
+
+            // Ré-incrémenter le stock pour chaque retour
+            if ($returns) {
+                $selStock = $db->prepare('SELECT id, quantite FROM stock WHERE produit_id=? AND depot_id=? FOR UPDATE');
+                $updStock = $db->prepare('UPDATE stock SET quantite=quantite+? WHERE id=?');
+                $insStock = $db->prepare('INSERT INTO stock (produit_id,depot_id,quantite) VALUES (?,?,?)');
+                foreach ($returns as $pid => $qRet) {
+                    $selStock->execute([(int)$pid, $depot_id]);
+                    $sr = $selStock->fetch(PDO::FETCH_ASSOC);
+                    if ($sr) {
+                        $updStock->execute([$qRet, (int)$sr['id']]);
+                    } else {
+                        $insStock->execute([(int)$pid, $depot_id, $qRet]);
+                    }
+                }
+            }
+
+            // Marquer le load comme ‘closed’
+            $db->prepare("UPDATE livreur_loads SET status='closed', closed_by=?, closed_at=NOW(), updated_at=NOW() WHERE id=?")
+                ->execute([$_SESSION['user_id'] ?? null, $loadId]);
+
+            // Audit snapshot des retours
+            try {
+                $db->prepare("INSERT INTO livreur_load_audits (load_id, action, items_json, notes, user_id) VALUES (?,?,?,?,?)")
+                    ->execute([$loadId, 'close', json_encode($returns, JSON_UNESCAPED_UNICODE), trim($_POST['notes'] ?? ''), $_SESSION['user_id'] ?? null]);
+            } catch (Exception $e) {
+                // silencieux
+            }
+
+            $db->commit();
+            setFlashMessage('success', 'Tournée clôturée, retours réintégrés en stock');
+            header('Location: ' . $_SERVER['REQUEST_URI']);
+            exit();
+        }
         if (($_POST['action'] ?? '') === 'save_load') {
             // Enregistrer/mettre à jour un panier en brouillon (sans impacter le stock)
             $depot_id = (int)($_POST['depot_id'] ?? ($_SESSION['depot_id'] ?? 0));
@@ -335,6 +421,13 @@ include 'includes/header.php';
     <h2>Panier reçu</h2>
     <?php if ($load): ?>
         <p><strong>Dépôt:</strong> <?= htmlspecialchars($load['depot_nom']) ?> — <strong>Livreur:</strong> <?= htmlspecialchars($load['livreur_nom']) ?></p>
+        <?php if ($hasLoadStatus && (($load['status'] ?? 'draft') === 'validated')): ?>
+            <form method="post" class="mt-2 mb-2">
+                <input type="hidden" name="action" value="close_tour" />
+                <input type="hidden" name="load_id" value="<?= (int)$load['id'] ?>" />
+                <button class="btn btn-warning" type="submit"><i class="fas fa-undo"></i> Clôturer la tournée (retour stock)</button>
+            </form>
+        <?php endif; ?>
         <table class="table">
             <thead>
                 <tr>

@@ -75,6 +75,21 @@ function ensureLivreurFlowTables(PDO $db)
             }
         } catch (Exception $e) {
         }
+        // Ajouter colonnes de clôture si absentes
+        try {
+            $hasClosedBy = $db->query("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME='livreur_loads' AND COLUMN_NAME='closed_by'")->fetchColumn();
+            if ((int)$hasClosedBy === 0) {
+                $db->exec("ALTER TABLE livreur_loads ADD COLUMN closed_by INT NULL AFTER validated_at");
+            }
+        } catch (Exception $e) {
+        }
+        try {
+            $hasClosedAt = $db->query("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME='livreur_loads' AND COLUMN_NAME='closed_at'")->fetchColumn();
+            if ((int)$hasClosedAt === 0) {
+                $db->exec("ALTER TABLE livreur_loads ADD COLUMN closed_at DATETIME NULL AFTER closed_by");
+            }
+        } catch (Exception $e) {
+        }
     } catch (Exception $e) {
         // silencieux: ne pas interrompre l'appli si pas de droit CREATE
     }

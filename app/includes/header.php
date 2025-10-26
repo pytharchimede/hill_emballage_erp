@@ -72,6 +72,18 @@
             font-weight: 500;
         }
 
+        .badge-main-depot {
+            background: #fff4cc;
+            border: 1px solid #ffcc66;
+            color: #7a5200;
+            padding: 0.25rem 0.5rem;
+            border-radius: 999px;
+            font-size: 0.85rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+
         .app-container {
             display: flex;
             min-height: calc(100vh - 80px);
@@ -446,6 +458,10 @@
                 <span class="user-role">
                     <i class="fas fa-user"></i> <?= ucfirst($_SESSION['user_role']) ?>
                 </span>
+                <?php $__depId = (int)($_SESSION['depot_id'] ?? 0);
+                if ($__depId > 0 && isMainDepot($__depId)): ?>
+                    <span class="badge-main-depot" title="Accès global (dépôt principal)"><i class="fas fa-star"></i> Dépôt principal</span>
+                <?php endif; ?>
                 <a href="<?= BASE_URL ?>/web_admin/profile.php" style="text-decoration:none;color:#333;">
                     <span><?= $_SESSION['user_name'] ?></span>
                 </a>
