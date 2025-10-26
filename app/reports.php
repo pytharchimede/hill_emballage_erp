@@ -68,7 +68,8 @@ function columnExists(PDO $db, $table, $column)
 $venteDateExpr = 'DATE(v.created_at)';
 
 $hasPayDate = columnExists($db, 'payments', 'date_payment');
-$payDateExpr = $hasPayDate ? 'COALESCE(date_payment, DATE(created_at))' : 'DATE(created_at)';
+// Désambiguïser avec l'alias de table 'p' (payments p ...)
+$payDateExpr = $hasPayDate ? 'COALESCE(p.date_payment, DATE(p.created_at))' : 'DATE(p.created_at)';
 
 // CA période en utilisant date_vente si présente sinon created_at
 $fromV = ' FROM ventes v ' . $joinsBase . ($joinsBase && strpos($joinsBase, 'clients c') !== false ? '' : '');
@@ -104,8 +105,23 @@ $topClients = $topClientsStmt->fetchAll(PDO::FETCH_ASSOC);
 $pageTitle = 'Rapports';
 include 'includes/header.php';
 ?>
+<?php
+// Petit rappel de périmètre: badge dépôt à côté du titre de page (pour rôles restreints)
+$__depId = (int)($_SESSION['depot_id'] ?? 0);
+$__role = $_SESSION['user_role'] ?? '';
+$__isMain = ($__depId > 0) && isMainDepot($__depId);
+$__isRestricted = (!$__isMain) && in_array($__role, ['vendeur', 'comptable', 'livreur'], true);
+$__current = isLoggedIn() ? (getCurrentUser() ?: null) : null;
+$__depotNom = $__current['depot_nom'] ?? null;
+?>
 <div class="page-header">
-    <h1><i class="fas fa-chart-bar"></i> Rapports</h1>
+    <h1><i class="fas fa-chart-bar"></i> Rapports
+        <?php if ($__isRestricted && $__depotNom): ?>
+            <span class="badge-depot" style="margin-left:.5rem" title="Accès limité à ce dépôt">
+                <i class="fas fa-location-dot"></i> Dépôt: <?= htmlspecialchars($__depotNom) ?>
+            </span>
+        <?php endif; ?>
+    </h1>
     <form method="get" class="row g-2">
         <div class="col-md-3"><input class="form-control" type="date" name="d1" value="<?= htmlspecialchars($d1) ?>" /></div>
         <div class="col-md-3"><input class="form-control" type="date" name="d2" value="<?= htmlspecialchars($d2) ?>" /></div>

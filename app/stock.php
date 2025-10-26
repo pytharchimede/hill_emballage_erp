@@ -104,8 +104,23 @@ $products = $db->query('SELECT id, nom FROM products WHERE is_active=1 ORDER BY 
 $pageTitle = 'Stock';
 include 'includes/header.php';
 ?>
+<?php
+// Badge dépôt au niveau du titre pour rôles restreints
+$__depId = (int)($_SESSION['depot_id'] ?? 0);
+$__role = $_SESSION['user_role'] ?? '';
+$__isMain = ($__depId > 0) && isMainDepot($__depId);
+$__isRestricted = (!$__isMain) && in_array($__role, ['vendeur', 'comptable', 'livreur'], true);
+$__current = isLoggedIn() ? (getCurrentUser() ?: null) : null;
+$__depotNom = $__current['depot_nom'] ?? null;
+?>
 <div class="page-header">
-    <h1><i class="fas fa-warehouse"></i> Stock</h1>
+    <h1><i class="fas fa-warehouse"></i> Stock
+        <?php if ($__isRestricted && $__depotNom): ?>
+            <span class="badge-depot" style="margin-left:.5rem" title="Accès limité à ce dépôt">
+                <i class="fas fa-location-dot"></i> Dépôt: <?= htmlspecialchars($__depotNom) ?>
+            </span>
+        <?php endif; ?>
+    </h1>
     <?php if (hasPermission('stock_update')): ?>
         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#transferModal"><i class="fas fa-exchange-alt"></i> Transfert</button>
     <?php endif; ?>
