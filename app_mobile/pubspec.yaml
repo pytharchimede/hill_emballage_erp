@@ -27,6 +27,7 @@ dependencies:
   # UI et navigation
   flutter_screenutil: ^5.9.0
   cupertino_icons: ^1.0.6
+  font_awesome_flutter: ^10.7.0
 
   # Formulaires et validation
   flutter_form_builder: ^9.1.1

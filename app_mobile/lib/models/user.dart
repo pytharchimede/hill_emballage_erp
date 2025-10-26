@@ -48,14 +48,24 @@ class User {
       return s == '1' || s.toLowerCase() == 'true';
     }
 
+    int? _toInt(dynamic v) {
+      if (v == null) return null;
+      if (v is int) return v;
+      if (v is double) return v.toInt();
+      final s = v.toString().trim();
+      if (s.isEmpty) return null;
+      final parsed = int.tryParse(s);
+      return parsed;
+    }
+
     return User(
-      id: json['id'],
+      id: _toInt(json['id']) ?? 0,
       username: json['username'],
       email: json['email'],
       fullName: json['full_name'],
       role: json['role'],
       phone: json['phone'],
-      depotId: json['depot_id'],
+      depotId: _toInt(json['depot_id']),
       depotNom: json['depot_nom'],
       isActive: _toBool(json['is_active']),
       lastLogin: _parseDate(json['last_login']),

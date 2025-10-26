@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../providers/auth_provider.dart';
 import 'clients_screen.dart';
 import 'sales_screen.dart';
@@ -32,9 +33,38 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final auth = Provider.of<AuthProvider>(context);
+    final depotNom = auth.user?.depotNom;
+    const pageTitles = <String>[
+      'Tableau de bord',
+      'Clients',
+      'Ventes',
+      'Stock',
+      'Paiements',
+    ];
     return Scaffold(
       appBar: AppBar(
-        title: const Text('HILL EMBALLAGE'),
+        title: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const FaIcon(FontAwesomeIcons.boxesStacked,
+                color: Colors.black87, size: 18),
+            const SizedBox(width: 6),
+            Text('HILL EMBALLAGE — ${pageTitles[_selectedIndex]}'),
+            if (depotNom != null && depotNom.isNotEmpty) ...[
+              const SizedBox(width: 8),
+              Chip(
+                label: Text('Dépôt: $depotNom'),
+                backgroundColor: const Color(0xFFEFF6FF),
+                labelStyle: const TextStyle(color: Color(0xFF0B4D88)),
+                side: const BorderSide(color: Color(0xFF99C9FF)),
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0),
+              ),
+            ]
+          ],
+        ),
         actions: [
           PopupMenuButton<String>(
             onSelected: (value) {

@@ -17,6 +17,7 @@
         "flutter_local_notifications",
         "flutter_screenutil",
         "flutter_spinkit",
+        "font_awesome_flutter",
         "http",
         "image_picker",
         "intl",
@@ -226,6 +227,13 @@
       "dependencies": [
         "flutter",
         "intl"
+      ]
+    },
+    {
+      "name": "font_awesome_flutter",
+      "version": "10.12.0",
+      "dependencies": [
+        "flutter"
       ]
     },
     {

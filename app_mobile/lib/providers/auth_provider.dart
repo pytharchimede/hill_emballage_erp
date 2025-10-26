@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../models/user.dart';
 import '../services/auth_service.dart';
+import '../services/api_service.dart';
+import '../utils/storage.dart';
 
 class AuthProvider extends ChangeNotifier {
   User? _user;
@@ -20,12 +22,21 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> _initialize() async {
-    // Initialisation au démarrage: vérifie le token une seule fois
+    // Initialisation au démarrage: restaurer session locale (token + user)
     _isLoading = true;
     notifyListeners();
 
     try {
-      await _verifyAndSetAuth();
+      final savedToken = await Storage.getToken();
+      final savedUser = await Storage.getUser();
+      if (savedToken != null && savedToken.isNotEmpty && savedUser != null) {
+        ApiService.setAuthToken(savedToken);
+        _user = User.fromJson(savedUser);
+        _isAuthenticated = true;
+      } else {
+        _user = null;
+        _isAuthenticated = false;
+      }
     } finally {
       _initialized = true;
       _isLoading = false;
@@ -33,22 +44,7 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> _verifyAndSetAuth() async {
-    try {
-      final response = await AuthService.verifyToken();
-
-      if (response['success'] == true) {
-        _user = User.fromJson(response['user']);
-        _isAuthenticated = true;
-      } else {
-        _user = null;
-        _isAuthenticated = false;
-      }
-    } catch (_) {
-      _user = null;
-      _isAuthenticated = false;
-    }
-  }
+  // Ancienne vérification via endpoint token: non utilisée (backend non requis)
 
   // Connexion
   Future<bool> login(String email, String password) async {
@@ -61,6 +57,12 @@ class AuthProvider extends ChangeNotifier {
       if (response['success'] == true) {
         _user = User.fromJson(response['user']);
         _isAuthenticated = true;
+        // Persister token et user
+        final token = response['token'] as String?;
+        if (token != null && token.isNotEmpty) {
+          await Storage.saveToken(token);
+        }
+        await Storage.saveUser(_user!.toJson());
         notifyListeners();
         return true;
       } else {
@@ -83,18 +85,16 @@ class AuthProvider extends ChangeNotifier {
       _user = null;
       _isAuthenticated = false;
       _clearError();
+      // Nettoyer le stockage
+      await Storage.clearToken();
+      await Storage.clearUser();
       notifyListeners();
     }
   }
 
   // Vérification du token au démarrage
   Future<void> checkAuthStatus() async {
-    _setLoading(true);
-    try {
-      await _verifyAndSetAuth();
-    } finally {
-      _setLoading(false);
-    }
+    // Optionnel: pourrait appeler une API /me si disponible
   }
 
   // Mise à jour du profil

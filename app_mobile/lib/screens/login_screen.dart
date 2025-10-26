@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../providers/auth_provider.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -21,6 +22,8 @@ class _LoginScreenState extends State<LoginScreen> {
     _passwordController.dispose();
     super.dispose();
   }
+
+  // Plus de paramètres serveur: base URL fixée dans le code.
 
   Future<void> _login() async {
     if (_formKey.currentState!.validate()) {
@@ -78,9 +81,9 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ],
                     ),
-                    child: const Icon(
-                      Icons.inventory_2,
-                      size: 60,
+                    child: const FaIcon(
+                      FontAwesomeIcons.boxesStacked,
+                      size: 56,
                       color: Color(0xFF757575),
                     ),
                   ),
@@ -129,21 +132,18 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                             const SizedBox(height: 24),
 
-                            // Email
+                            // Email ou identifiant
                             TextFormField(
                               controller: _emailController,
                               keyboardType: TextInputType.emailAddress,
                               decoration: const InputDecoration(
-                                labelText: 'Email',
+                                labelText: 'Email ou identifiant',
                                 prefixIcon: Icon(Icons.email_outlined),
-                                hintText: 'Entrez votre email',
+                                hintText: 'Entrez votre email ou identifiant',
                               ),
                               validator: (value) {
                                 if (value == null || value.isEmpty) {
-                                  return 'Veuillez entrer votre email';
-                                }
-                                if (!value.contains('@')) {
-                                  return 'Veuillez entrer un email valide';
+                                  return 'Veuillez entrer votre email ou identifiant';
                                 }
                                 return null;
                               },
@@ -215,42 +215,13 @@ class _LoginScreenState extends State<LoginScreen> {
                                 );
                               },
                             ),
+                            const SizedBox(height: 12),
                           ],
                         ),
                       ),
                     ),
                   ),
                   const SizedBox(height: 24),
-
-                  // Informations de démonstration
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.8),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Column(
-                      children: [
-                        Text(
-                          'Compte de démonstration',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black.withValues(alpha: 0.7),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Email: admin@hillemballage.ci\nMot de passe: admin123',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.black.withValues(alpha: 0.6),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
                 ],
               ),
             ),

@@ -5,15 +5,13 @@ class StockScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(
-        child: Text(
-          'Écran Stock\n(En développement)',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 18,
-            color: Colors.grey,
-          ),
+    return const Center(
+      child: Text(
+        'Écran Stock\n(En développement)',
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          fontSize: 18,
+          color: Colors.grey,
         ),
       ),
     );

@@ -2,15 +2,18 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
 import 'http_client_stub.dart' if (dart.library.html) 'http_client_web.dart';
+// baseUrl est fixé, pas de stockage nécessaire
 
 class ApiService {
-  // URL fournie par l'utilisateur
-  static const String baseUrl = 'https://app.hillemballage.ci/backend/requests';
+  // URL par défaut (peut être remplacée via paramètres)
+  static const String _base = 'https://app.hillemballage.ci/backend/requests';
   static Map<String, String> _defaultHeaders = {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
   };
   static final http.Client _client = createHttpClient();
+
+  static String get baseUrl => _base;
 
   static void setAuthToken(String token) {
     _defaultHeaders['Authorization'] = 'Bearer $token';
@@ -28,7 +31,7 @@ class ApiService {
     try {
       final response = await _client
           .get(
-            Uri.parse('$baseUrl/$endpoint'),
+            Uri.parse('$_base/$endpoint'),
             headers: headers,
           )
           .timeout(const Duration(seconds: 15));
@@ -51,7 +54,7 @@ class ApiService {
     try {
       final response = await _client
           .post(
-            Uri.parse('$baseUrl/$endpoint'),
+            Uri.parse('$_base/$endpoint'),
             headers: headers,
             body: jsonEncode(data),
           )
@@ -81,7 +84,7 @@ class ApiService {
 
       final response = await _client
           .post(
-            Uri.parse('$baseUrl/$endpoint'),
+            Uri.parse('$_base/$endpoint'),
             headers: formHeaders,
             body: Uri(queryParameters: data).query, // clé=valeur&...
           )
@@ -107,7 +110,7 @@ class ApiService {
     try {
       final response = await _client
           .put(
-            Uri.parse('$baseUrl/$endpoint'),
+            Uri.parse('$_base/$endpoint'),
             headers: headers,
             body: jsonEncode(data),
           )
@@ -124,7 +127,7 @@ class ApiService {
     try {
       final response = await _client
           .delete(
-            Uri.parse('$baseUrl/$endpoint'),
+            Uri.parse('$_base/$endpoint'),
             headers: headers,
           )
           .timeout(const Duration(seconds: 15));
