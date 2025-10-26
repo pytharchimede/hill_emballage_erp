@@ -87,7 +87,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (columnExists($db, 'clients', 'code_client')) {
                 // Schéma backend/migrations (clients avancés)
                 $code = 'CLT-' . strtoupper(dechex(time()));
-                $cols = "code_client, nom, prenoms, telephone, email, adresse, zone, type_client, credit_limite, solde_credit, points_fidelite, qr_code, photo_url, is_active, created_by";
+                $cols = "code_client, nom, prenom, telephone, email, adresse, zone, type_client, credit_limite, solde_credit, points_fidelite, qr_code, photo_url, is_active, created_by";
                 $vals = "?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, NULL, NULL, 1, ?";
                 if (columnExists($db, 'clients', 'livreur_id')) {
                     $cols .= ", livreur_id";
@@ -588,7 +588,7 @@ include 'includes/header.php';
                                 <td>
                                     <div class="client-info">
                                         <?php
-                                        $displayName = $client['name'] ?? trim(($client['nom'] ?? '') . ' ' . ($client['prenom'] ?? ($client['prenoms'] ?? '')));
+                                        $displayName = $client['name'] ?? trim(($client['nom'] ?? '') . ' ' . ($client['prenom'] ?? ($client['prenom'] ?? '')));
                                         if (!$displayName) {
                                             $displayName = 'Client';
                                         }
