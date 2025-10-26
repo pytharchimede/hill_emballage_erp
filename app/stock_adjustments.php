@@ -22,6 +22,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $motif      = $_POST['motif'] ?? 'inventaire';
             $notes      = trim($_POST['notes'] ?? '');
             if (!$produit_id || !$depot_id || $delta == 0) throw new Exception('Champs invalides');
+            // Sécurité dépôt: admin principal -> tous, sinon uniquement son dépôt
+            $uRole = $_SESSION['user_role'] ?? '';
+            $uDepot = (int)($_SESSION['depot_id'] ?? 0);
+            $uIsMain = $uDepot > 0 && isMainDepot($uDepot);
+            $okDepot = ($uRole === 'admin' && $uIsMain) ? true : ($depot_id === $uDepot);
+            if (!$okDepot) throw new Exception('Dépôt non autorisé');
             $db->beginTransaction();
             $db->prepare('INSERT INTO stock_adjustments (produit_id,depot_id,delta,motif,notes,created_by) VALUES (?,?,?,?,?,?)')
                 ->execute([$produit_id, $depot_id, $delta, $motif, $notes, $_SESSION['user_id']]);
@@ -58,7 +64,16 @@ $colExists = function (PDO $db, $table, $col) {
 };
 $prodTbl = $colExists($db, 'products', 'id') ? 'products' : ($colExists($db, 'produits', 'id') ? 'produits' : null);
 
-$depots = $db->query('SELECT id, nom FROM depots WHERE is_active=1 ORDER BY nom')->fetchAll(PDO::FETCH_ASSOC);
+$userRole = $_SESSION['user_role'] ?? '';
+$userDepotId = (int)($_SESSION['depot_id'] ?? 0);
+$isMain = $userDepotId > 0 && isMainDepot($userDepotId);
+if ($userRole === 'admin' && $isMain) {
+    $depots = $db->query('SELECT id, nom FROM depots WHERE is_active=1 ORDER BY nom')->fetchAll(PDO::FETCH_ASSOC);
+} else {
+    $st = $db->prepare('SELECT id, nom FROM depots WHERE is_active=1 AND id=? ORDER BY nom');
+    $st->execute([$userDepotId]);
+    $depots = $st->fetchAll(PDO::FETCH_ASSOC);
+}
 $products = $prodTbl ? $db->query("SELECT id, nom FROM `$prodTbl` WHERE is_active=1 ORDER BY nom")->fetchAll(PDO::FETCH_ASSOC) : [];
 
 $pageTitle = 'Ajustements d\'inventaire';

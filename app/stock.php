@@ -12,6 +12,7 @@ if (!hasPermission('stock_read')) {
 
 $userRole = $_SESSION['user_role'] ?? '';
 $userDepotId = (int)($_SESSION['depot_id'] ?? 0);
+$isRestricted = in_array($userRole, ['vendeur', 'comptable', 'livreur'], true) && $userDepotId > 0 && !isMainDepot($userDepotId);
 
 $msg = '';
 $msgType = '';
@@ -62,7 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $search = $_GET['search'] ?? '';
 $depot = (int)($_GET['depot'] ?? 0);
 // Scoping par dépôt: vendeur/comptable/livreur (sauf dépôt principal)
-if (in_array($userRole, ['vendeur', 'comptable', 'livreur'], true) && $userDepotId > 0 && !isMainDepot($userDepotId)) {
+if ($isRestricted) {
     $depot = $userDepotId;
 }
 $page = max(1, (int)($_GET['page'] ?? 1));
@@ -91,7 +92,7 @@ $rows = $st->fetchAll(PDO::FETCH_ASSOC);
 $pages = max(1, (int)ceil($total / $limit));
 
 // Restreindre la liste des dépôts pour vendeurs/comptables/livreurs (hors dépôt principal)
-if (in_array($userRole, ['vendeur', 'comptable', 'livreur'], true) && $userDepotId > 0 && !isMainDepot($userDepotId)) {
+if ($isRestricted) {
     $ds = $db->prepare('SELECT id, nom FROM depots WHERE is_active=1 AND id=? ORDER BY nom');
     $ds->execute([$userDepotId]);
     $depots = $ds->fetchAll(PDO::FETCH_ASSOC);
@@ -116,7 +117,7 @@ include 'includes/header.php';
         <div class="col-md-4"><input class="form-control" name="search" placeholder="Rechercher produit/code" value="<?= htmlspecialchars($search) ?>" /></div>
         <div class="col-md-3">
             <select class="form-select" name="depot">
-                <?php if (!($userRole === 'vendeur' && $userDepotId > 0)): ?>
+                <?php if (!$isRestricted): ?>
                     <option value="0">Tous dépôts</option>
                 <?php endif; ?>
                 <?php foreach ($depots as $d): ?><option value="<?= (int)$d['id'] ?>" <?= $depot === (int)$d['id'] ? 'selected' : '' ?>><?= htmlspecialchars($d['nom']) ?></option><?php endforeach; ?>
@@ -204,7 +205,7 @@ include 'includes/header.php';
     $td1 = $_GET['td1'] ?? '';
     $td2 = $_GET['td2'] ?? '';
     $tdepot = (int)($_GET['tdepot'] ?? 0);
-    if (in_array($userRole, ['vendeur', 'comptable', 'livreur'], true) && $userDepotId > 0 && !isMainDepot($userDepotId)) {
+    if ($isRestricted) {
         $tdepot = $userDepotId;
     }
     $tprod = trim($_GET['tprod'] ?? '');
@@ -260,7 +261,7 @@ include 'includes/header.php';
         <div class="col-md-3"><input class="form-control" type="date" name="td2" value="<?= htmlspecialchars($td2) ?>" /></div>
         <div class="col-md-3">
             <select class="form-select" name="tdepot">
-                <?php if (!($userRole === 'vendeur' && $userDepotId > 0)): ?>
+                <?php if (!$isRestricted): ?>
                     <option value="0">Tous dépôts</option>
                 <?php endif; ?>
                 <?php foreach ($depots as $d): ?><option value="<?= (int)$d['id'] ?>" <?= $tdepot === (int)$d['id'] ? 'selected' : '' ?>><?= htmlspecialchars($d['nom']) ?></option><?php endforeach; ?>

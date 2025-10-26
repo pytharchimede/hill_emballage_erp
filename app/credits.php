@@ -23,6 +23,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $ref = trim($_POST['reference'] ?? '');
             if ($vente_id <= 0 || $montant <= 0) throw new Exception('Vente ou montant invalide');
 
+            // Scoping: vérifier que la vente appartient au périmètre du dépôt de l'utilisateur (sauf dépôt principal)
+            $userDepotId = (int)($_SESSION['depot_id'] ?? 0);
+            $isMain = $userDepotId > 0 && isMainDepot($userDepotId);
+            if (!$isMain) {
+                $stScope = $db->prepare("SELECT COUNT(*)
+                    FROM ventes v
+                    JOIN clients c ON v.client_id=c.id
+                    LEFT JOIN users uu ON v.user_id=uu.id
+                    LEFT JOIN users lvr ON v.livreur_id=lvr.id
+                    WHERE v.id=? AND (
+                        v.depot_id = ? OR
+                        (v.livreur_id IS NOT NULL AND lvr.depot_id = ?) OR
+                        (v.user_id IS NOT NULL AND uu.depot_id = ?) OR
+                        c.depot_id = ?
+                    )");
+                $stScope->execute([$vente_id, $userDepotId, $userDepotId, $userDepotId, $userDepotId]);
+                if ((int)$stScope->fetchColumn() === 0) throw new Exception('Vente hors de votre dépôt');
+            }
+
             // Valider le restant dû de la vente et plafonner le paiement
             $stChk = $db->prepare("SELECT montant_total, montant_paye FROM ventes WHERE id=?");
             $stChk->execute([$vente_id]);
@@ -72,13 +91,29 @@ function colExists2(PDO $db, $table, $col)
 $hasDateVente = colExists2($db, 'ventes', 'date_vente');
 $dateExpr = $hasDateVente ? 'COALESCE(v.date_vente, DATE(v.created_at))' : 'DATE(v.created_at)';
 
+// Scoping dépôt
+$userRole = $_SESSION['user_role'] ?? '';
+$userDepotId = (int)($_SESSION['depot_id'] ?? 0);
+$isMain = $userDepotId > 0 && isMainDepot($userDepotId);
+
+$joinsScope = " LEFT JOIN users uu ON v.user_id=uu.id LEFT JOIN users lvr ON v.livreur_id=lvr.id ";
+$scopeSql = '';
 $params = [];
+if (!$isMain) {
+    $scopeSql = " AND (v.depot_id = ? OR (v.livreur_id IS NOT NULL AND lvr.depot_id = ?) OR (v.user_id IS NOT NULL AND uu.depot_id = ?) OR c.depot_id = ?)";
+}
+
 if ($scope === 'period') {
-    $where = "WHERE $dateExpr BETWEEN ? AND ? AND (v.montant_paye < v.montant_total)";
+    $where = "WHERE $dateExpr BETWEEN ? AND ? AND (v.montant_paye < v.montant_total)" . ($scopeSql ? $scopeSql : '');
     $params = [$d1, $d2];
+    if ($scopeSql) {
+        array_push($params, $userDepotId, $userDepotId, $userDepotId, $userDepotId);
+    }
 } else {
-    // Global: ne pas filtrer par dates, lister tous les encours
-    $where = "WHERE (v.montant_paye < v.montant_total)";
+    $where = "WHERE (v.montant_paye < v.montant_total)" . ($scopeSql ? $scopeSql : '');
+    if ($scopeSql) {
+        array_push($params, $userDepotId, $userDepotId, $userDepotId, $userDepotId);
+    }
 }
 if ($search) {
     $where .= " AND (v.numero_vente LIKE ? OR c.nom LIKE ?)";
@@ -87,7 +122,7 @@ if ($search) {
 }
 
 $sql = "SELECT v.id, v.numero_vente, $dateExpr as d, v.montant_total, v.montant_paye, (v.montant_total - v.montant_paye) as restant, c.nom as client
-        FROM ventes v JOIN clients c ON v.client_id=c.id
+        FROM ventes v JOIN clients c ON v.client_id=c.id $joinsScope
         $where ORDER BY d DESC, v.id DESC";
 $st = $db->prepare($sql);
 $st->execute($params);
