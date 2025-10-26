@@ -122,6 +122,9 @@ include 'includes/header.php';
                 <?php endif; ?>
                 <?php foreach ($depots as $d): ?><option value="<?= (int)$d['id'] ?>" <?= $depot === (int)$d['id'] ? 'selected' : '' ?>><?= htmlspecialchars($d['nom']) ?></option><?php endforeach; ?>
             </select>
+            <?php if (count($depots) === 1): $only = $depots[0]; ?>
+                <div class="form-text mt-1"><span class="badge bg-warning-subtle border text-dark"><i class="fas fa-lock"></i> Dépôt actif: <?= htmlspecialchars($only['nom']) ?></span></div>
+            <?php endif; ?>
         </div>
         <div class="col-md-2"><button class="btn w-100">Filtrer</button></div>
         <div class="col-md-3">
@@ -266,6 +269,9 @@ include 'includes/header.php';
                 <?php endif; ?>
                 <?php foreach ($depots as $d): ?><option value="<?= (int)$d['id'] ?>" <?= $tdepot === (int)$d['id'] ? 'selected' : '' ?>><?= htmlspecialchars($d['nom']) ?></option><?php endforeach; ?>
             </select>
+            <?php if (count($depots) === 1): $only = $depots[0]; ?>
+                <div class="form-text mt-1"><span class="badge bg-warning-subtle border text-dark"><i class="fas fa-lock"></i> Dépôt actif: <?= htmlspecialchars($only['nom']) ?></span></div>
+            <?php endif; ?>
         </div>
         <div class="col-md-3">
             <input class="form-control" name="tprod" list="productsList" placeholder="Produit ou code" value="<?= htmlspecialchars($tprod) ?>" />

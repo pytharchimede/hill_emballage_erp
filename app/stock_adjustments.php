@@ -91,10 +91,18 @@ include 'includes/header.php';
                 <option value="">—</option>
                 <?php foreach ($products as $p): ?><option value="<?= (int)$p['id'] ?>"><?= htmlspecialchars($p['nom']) ?></option><?php endforeach; ?>
             </select></div>
-        <div class="col-md-4"><label class="form-label">Dépôt</label><select class="form-select" name="depot_id" required>
+        <div class="col-md-4">
+            <label class="form-label">Dépôt</label>
+            <select class="form-select" name="depot_id" required>
                 <option value="">—</option>
                 <?php foreach ($depots as $d): ?><option value="<?= (int)$d['id'] ?>"><?= htmlspecialchars($d['nom']) ?></option><?php endforeach; ?>
-            </select></div>
+            </select>
+            <?php if (count($depots) === 1): $only = $depots[0]; ?>
+                <div class="form-text mt-1">
+                    <span class="badge bg-warning-subtle border text-dark"><i class="fas fa-lock"></i> Dépôt actif: <?= htmlspecialchars($only['nom']) ?></span>
+                </div>
+            <?php endif; ?>
+        </div>
         <div class="col-md-4"><label class="form-label">Delta (positif ou négatif)</label><input class="form-control" type="number" step="0.01" name="delta" required /></div>
         <div class="col-md-4"><label class="form-label">Motif</label><select class="form-select" name="motif">
                 <option value="inventaire">Inventaire</option>

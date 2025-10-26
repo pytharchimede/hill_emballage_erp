@@ -84,6 +84,18 @@
             gap: 0.35rem;
         }
 
+        .badge-depot {
+            background: #eef7ff;
+            border: 1px solid #99c9ff;
+            color: #0b4d88;
+            padding: 0.25rem 0.5rem;
+            border-radius: 999px;
+            font-size: 0.85rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+
         .app-container {
             display: flex;
             min-height: calc(100vh - 80px);
@@ -458,9 +470,18 @@
                 <span class="user-role">
                     <i class="fas fa-user"></i> <?= ucfirst($_SESSION['user_role']) ?>
                 </span>
-                <?php $__depId = (int)($_SESSION['depot_id'] ?? 0);
-                if ($__depId > 0 && isMainDepot($__depId)): ?>
+                <?php
+                $__depId = (int)($_SESSION['depot_id'] ?? 0);
+                $__current = isLoggedIn() ? (getCurrentUser() ?: null) : null;
+                $__depotNom = $__current['depot_nom'] ?? null;
+                $__role = $_SESSION['user_role'] ?? '';
+                $__isMain = ($__depId > 0) && isMainDepot($__depId);
+                $__isRestricted = (!$__isMain) && in_array($__role, ['vendeur', 'comptable', 'livreur'], true);
+                ?>
+                <?php if ($__isMain): ?>
                     <span class="badge-main-depot" title="Accès global (dépôt principal)"><i class="fas fa-star"></i> Dépôt principal</span>
+                <?php elseif ($__isRestricted && $__depotNom): ?>
+                    <span class="badge-depot" title="Accès limité à ce dépôt"><i class="fas fa-location-dot"></i> Dépôt: <?= htmlspecialchars($__depotNom) ?></span>
                 <?php endif; ?>
                 <a href="<?= BASE_URL ?>/web_admin/profile.php" style="text-decoration:none;color:#333;">
                     <span><?= $_SESSION['user_name'] ?></span>

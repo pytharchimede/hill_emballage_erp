@@ -100,10 +100,15 @@ include 'includes/header.php';
     <h1><i class="fas fa-warehouse"></i> Etat journalier Dépôt</h1>
     <form method="get" class="row g-2">
         <div class="col-md-3"><input class="form-control" type="date" name="date" value="<?= htmlspecialchars($selectedDate) ?>" /></div>
-        <div class="col-md-5"><select class="form-select" name="depot_id" required>
+        <div class="col-md-5">
+            <select class="form-select" name="depot_id" required>
                 <option value="">— Sélectionner dépôt —</option>
                 <?php foreach ($depots as $d): ?><option value="<?= (int)$d['id'] ?>" <?= $depotId === (int)$d['id'] ? 'selected' : '' ?>><?= htmlspecialchars($d['nom']) ?></option><?php endforeach; ?>
-            </select></div>
+            </select>
+            <?php if ($restrictToOwnDepot && count($depots) === 1): $only = $depots[0]; ?>
+                <div class="form-text mt-1"><span class="badge bg-warning-subtle border text-dark"><i class="fas fa-lock"></i> Dépôt actif: <?= htmlspecialchars($only['nom']) ?></span></div>
+            <?php endif; ?>
+        </div>
         <div class="col-md-2"><button class="btn w-100">Voir</button></div>
     </form>
 </div>
