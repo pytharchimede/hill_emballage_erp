@@ -53,6 +53,24 @@ $ALL_PERMS = [
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
     try {
+        // Adapter les rôles UI aux valeurs de l'ENUM BDD si nécessaire (évite NULL si schéma non migré)
+        $mapRoleForStorage = function (string $wantedRole) use ($db): string {
+            $wantedRole = trim(strtolower($wantedRole));
+            $allowed = [];
+            try {
+                $col = $db->query("SHOW COLUMNS FROM users LIKE 'role'")->fetch(PDO::FETCH_ASSOC);
+                if ($col && preg_match("/enum\((.*)\)/i", (string)($col['Type'] ?? ''), $m)) {
+                    $raw = $m[1];
+                    $allowed = array_map(fn($v) => trim(strtolower(trim($v, "'\""))), explode(',', $raw));
+                }
+            } catch (Exception $e) { /* ignore */
+            }
+            if (!$allowed) $allowed = ['admin', 'vendeur', 'livreur', 'comptable'];
+            if (in_array($wantedRole, $allowed, true)) return $wantedRole;
+            if ($wantedRole === 'commercial') return in_array('livreur', $allowed, true) ? 'livreur' : (in_array('vendeur', $allowed, true) ? 'vendeur' : $allowed[0]);
+            if ($wantedRole === 'gerant') return in_array('vendeur', $allowed, true) ? 'vendeur' : (in_array('admin', $allowed, true) ? 'admin' : $allowed[0]);
+            return in_array('vendeur', $allowed, true) ? 'vendeur' : $allowed[0];
+        };
         if ($action === 'create') {
             $username = trim($_POST['username'] ?? '');
             $email = trim($_POST['email'] ?? '');
@@ -62,10 +80,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (function_exists('normalizeRole')) {
                 $role = normalizeRole($role);
             }
+            $storeRole = $mapRoleForStorage($role);
             $depot = (int)($_POST['depot_id'] ?? 0);
             $pass = password_hash($_POST['password'] ?? 'changeme', PASSWORD_DEFAULT);
             $st = $db->prepare("INSERT INTO users (username,email,password,full_name,role,depot_id) VALUES (?,?,?,?,?,?)");
-            $st->execute([$username, $email, $pass, $full, $role, $depot ?: null]);
+            $st->execute([$username, $email, $pass, $full, $storeRole, $depot ?: null]);
             $newUserId = (int)$db->lastInsertId();
             // Persister les overrides de permissions si fournis
             if (isset($_POST['permissions']) && is_array($_POST['permissions'])) {
@@ -87,14 +106,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (function_exists('normalizeRole')) {
                 $role = normalizeRole($role);
             }
+            $storeRole = $mapRoleForStorage($role);
             $depot = (int)($_POST['depot_id'] ?? 0);
             if (!empty($_POST['password'])) {
                 $pass = password_hash($_POST['password'], PASSWORD_DEFAULT);
                 $st = $db->prepare("UPDATE users SET username=?, email=?, full_name=?, role=?, depot_id=?, password=?, updated_at=NOW() WHERE id=?");
-                $st->execute([$username, $email, $full, $role, $depot ?: null, $pass, $id]);
+                $st->execute([$username, $email, $full, $storeRole, $depot ?: null, $pass, $id]);
             } else {
                 $st = $db->prepare("UPDATE users SET username=?, email=?, full_name=?, role=?, depot_id=?, updated_at=NOW() WHERE id=?");
-                $st->execute([$username, $email, $full, $role, $depot ?: null, $id]);
+                $st->execute([$username, $email, $full, $storeRole, $depot ?: null, $id]);
             }
             // Mettre à jour les overrides si fournis
             if (isset($_POST['permissions']) && is_array($_POST['permissions'])) {
