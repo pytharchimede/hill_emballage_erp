@@ -14,21 +14,41 @@ try {
     $role = $_SESSION['user_role'] ?? '';
     $userId = (int)($_SESSION['user_id'] ?? 0);
 
-    $vendeurId = null;
-    // Gérants/Admins peuvent fournir un vendeur_id pour filtrer
+    // Admin/Gérant: peuvent voir toutes les distributions ouvertes, ou filtrer par vendeur_id si fourni
     if (in_array($role, ['admin', 'gerant'], true)) {
-        if (isset($_GET['vendeur_id'])) {
-            $vendeurId = (int)$_GET['vendeur_id'];
+        $vendeurId = isset($_GET['vendeur_id']) ? (int)$_GET['vendeur_id'] : 0;
+        if ($vendeurId > 0) {
+            $stmt = $service->getOpenByVendeur($vendeurId);
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } else {
+            // Nom dépôt: nom/name ; Nom vendeur: full_name ou nom+prenoms
+            $sql = "SELECT a.*, 
+                    COALESCE(d.nom, d.name) AS depot_nom,
+                    COALESCE(u.full_name, CONCAT(COALESCE(u.nom,''),' ',COALESCE(u.prenoms,''))) AS vendeur_nom
+                    FROM vendor_assignments a
+                    LEFT JOIN depots d ON d.id = a.depot_id
+                    LEFT JOIN users u ON u.id = a.vendeur_id
+                    WHERE a.status = 'open'
+                    ORDER BY a.created_at DESC";
+            $stmt = $db->prepare($sql);
+            $stmt->execute();
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
         }
+    } else {
+        // Commercial: uniquement ses propres distributions ouvertes, avec noms enrichis
+        $sql = "SELECT a.*, 
+                COALESCE(d.nom, d.name) AS depot_nom,
+                COALESCE(u.full_name, CONCAT(COALESCE(u.nom,''),' ',COALESCE(u.prenoms,''))) AS vendeur_nom
+                FROM vendor_assignments a
+                LEFT JOIN depots d ON d.id = a.depot_id
+                LEFT JOIN users u ON u.id = a.vendeur_id
+                WHERE a.status = 'open' AND a.vendeur_id = ?
+                ORDER BY a.created_at DESC";
+        $stmt = $db->prepare($sql);
+        $stmt->execute([$userId]);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    if ($vendeurId === null) {
-        // Vendeur/Livreur/Commercial voient leurs assignations ouvertes
-        $vendeurId = $userId;
-    }
-
-    $stmt = $service->getOpenByVendeur($vendeurId);
-    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
     echo json_encode(['ok' => true, 'items' => $rows]);
 } catch (Throwable $e) {
     http_response_code(500);

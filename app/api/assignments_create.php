@@ -9,13 +9,7 @@ if (!isLoggedIn()) {
     exit;
 }
 
-// Autorisé: admin, gerant
-$role = $_SESSION['user_role'] ?? '';
-if (!in_array($role, ['admin', 'gerant'], true) && !hasPermission('assignments_manage')) {
-    http_response_code(403);
-    echo json_encode(['error' => 'forbidden']);
-    exit;
-}
+$role = normalizeRole($_SESSION['user_role'] ?? '');
 
 try {
     $input = $_SERVER['REQUEST_METHOD'] === 'POST' ? $_POST : $_GET;
@@ -54,6 +48,66 @@ try {
     if (empty($norm)) {
         http_response_code(400);
         echo json_encode(['error' => 'invalid_details']);
+        exit;
+    }
+
+    // Autorisations
+    $allowed = in_array($role, ['admin', 'gerant'], true) || hasPermission('assignments_manage');
+    if (!$allowed) {
+        if ($role === 'vendeur') {
+            // Vendeur: contraintes spécifiques
+            $sessionDepotId = (int)($_SESSION['depot_id'] ?? 0);
+            if ($sessionDepotId <= 0 || $depot_id !== $sessionDepotId) {
+                http_response_code(403);
+                echo json_encode(['error' => 'invalid_depot']);
+                exit;
+            }
+            // Vérifier que l'assigné est un livreur (même dépôt si colonne présente)
+            $colExists = function ($col) use ($db) {
+                $q = $db->prepare("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME='users' AND COLUMN_NAME=?");
+                $q->execute([$col]);
+                return ((int)$q->fetchColumn()) > 0;
+            };
+            $roleCol = $colExists('user_role') ? 'user_role' : 'role';
+            $hasDepotCol = $colExists('depot_id');
+            $sql = "SELECT $roleCol AS role" . ($hasDepotCol ? ", depot_id" : "") . " FROM users WHERE id = ?";
+            $st = $db->prepare($sql);
+            $st->execute([$vendeur_id]);
+            $assignee = $st->fetch(PDO::FETCH_ASSOC);
+            if (!$assignee || ($assignee['role'] ?? '') !== 'livreur') {
+                http_response_code(403);
+                echo json_encode(['error' => 'invalid_assignee']);
+                exit;
+            }
+            if ($hasDepotCol && (int)$assignee['depot_id'] !== $sessionDepotId) {
+                http_response_code(403);
+                echo json_encode(['error' => 'invalid_assignee_depot']);
+                exit;
+            }
+            // OK, autoriser
+            $allowed = true;
+        }
+    }
+
+    if (!$allowed) {
+        http_response_code(403);
+        echo json_encode(['error' => 'forbidden']);
+        exit;
+    }
+
+    // Enforcer que l'assigné est bien un commercial
+    $colExists = function ($col) use ($db) {
+        $q = $db->prepare("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME='users' AND COLUMN_NAME=?");
+        $q->execute([$col]);
+        return ((int)$q->fetchColumn()) > 0;
+    };
+    $roleCol = $colExists('user_role') ? 'user_role' : 'role';
+    $st = $db->prepare("SELECT $roleCol AS role FROM users WHERE id = ?");
+    $st->execute([$vendeur_id]);
+    $assignee = $st->fetch(PDO::FETCH_ASSOC);
+    if (!$assignee || normalizeRole($assignee['role'] ?? '') !== 'commercial') {
+        http_response_code(400);
+        echo json_encode(['error' => 'assignee_must_be_commercial']);
         exit;
     }
 

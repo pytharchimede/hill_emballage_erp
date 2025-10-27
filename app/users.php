@@ -57,7 +57,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $username = trim($_POST['username'] ?? '');
             $email = trim($_POST['email'] ?? '');
             $full = trim($_POST['full_name'] ?? '');
-            $role = $_POST['role'] ?? 'vendeur';
+            $role = $_POST['role'] ?? 'commercial';
+            // normaliser les anciens rôles éventuellement envoyés
+            if (function_exists('normalizeRole')) {
+                $role = normalizeRole($role);
+            }
             $depot = (int)($_POST['depot_id'] ?? 0);
             $pass = password_hash($_POST['password'] ?? 'changeme', PASSWORD_DEFAULT);
             $st = $db->prepare("INSERT INTO users (username,email,password,full_name,role,depot_id) VALUES (?,?,?,?,?,?)");
@@ -79,7 +83,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $username = trim($_POST['username'] ?? '');
             $email = trim($_POST['email'] ?? '');
             $full = trim($_POST['full_name'] ?? '');
-            $role = $_POST['role'] ?? 'vendeur';
+            $role = $_POST['role'] ?? 'commercial';
+            if (function_exists('normalizeRole')) {
+                $role = normalizeRole($role);
+            }
             $depot = (int)($_POST['depot_id'] ?? 0);
             if (!empty($_POST['password'])) {
                 $pass = password_hash($_POST['password'], PASSWORD_DEFAULT);
@@ -166,7 +173,7 @@ include 'includes/header.php';
         <div class="col-md-3">
             <select class="form-select" name="role">
                 <option value="all" <?= $roleF === 'all' ? 'selected' : '' ?>>Tous rôles</option>
-                <?php foreach (['admin', 'vendeur', 'livreur', 'comptable'] as $r): ?><option value="<?= $r ?>" <?= $roleF === $r ? 'selected' : '' ?>><?= ucfirst($r) ?></option><?php endforeach; ?>
+                <?php foreach (['admin', 'gerant', 'commercial', 'comptable'] as $r): ?><option value="<?= $r ?>" <?= $roleF === $r ? 'selected' : '' ?>><?= htmlspecialchars(roleLabel($r)) ?></option><?php endforeach; ?>
             </select>
         </div>
         <div class="col-md-2"><button class="btn w-100">Filtrer</button></div>
@@ -192,7 +199,7 @@ include 'includes/header.php';
                 <tr>
                     <td><?= htmlspecialchars($u['full_name']) ?></td>
                     <td><?= htmlspecialchars($u['email']) ?></td>
-                    <td><?= htmlspecialchars(ucfirst($u['role'])) ?></td>
+                    <td><?= htmlspecialchars(roleLabel($u['role'])) ?></td>
                     <td><?= htmlspecialchars($u['depot_nom'] ?? '-') ?></td>
                     <td><?= $u['last_login'] ? htmlspecialchars($u['last_login']) : '—' ?></td>
                     <td>
@@ -239,7 +246,7 @@ include 'includes/header.php';
                             <div class="mb-2"><label class="form-label">Identifiant</label><input class="form-control" name="username" required /></div>
                             <div class="mb-2"><label class="form-label">Mot de passe</label><input class="form-control" type="password" name="password" required /></div>
                             <div class="row g-2">
-                                <div class="col-md-6"><label class="form-label">Rôle</label><select class="form-select" name="role"><?php foreach (['admin', 'vendeur', 'livreur', 'comptable'] as $r): ?><option value="<?= $r ?>"><?= ucfirst($r) ?></option><?php endforeach; ?></select></div>
+                                <div class="col-md-6"><label class="form-label">Rôle</label><select class="form-select" name="role"><?php foreach (['admin', 'gerant', 'commercial', 'comptable'] as $r): ?><option value="<?= $r ?>"><?= htmlspecialchars(roleLabel($r)) ?></option><?php endforeach; ?></select></div>
                                 <div class="col-md-6"><label class="form-label">Dépôt</label><select class="form-select" name="depot_id">
                                         <option value="">—</option><?php foreach ($depots as $d): ?><option value="<?= (int)$d['id'] ?>"><?= htmlspecialchars($d['nom']) ?></option><?php endforeach; ?>
                                     </select></div>
@@ -282,7 +289,7 @@ include 'includes/header.php';
                             <div class="mb-2"><label class="form-label">Identifiant</label><input class="form-control" name="username" id="edit_username" required /></div>
                             <div class="mb-2"><label class="form-label">Nouveau mot de passe (optionnel)</label><input class="form-control" type="password" name="password" /></div>
                             <div class="row g-2">
-                                <div class="col-md-6"><label class="form-label">Rôle</label><select class="form-select" name="role" id="edit_role"><?php foreach (['admin', 'vendeur', 'livreur', 'comptable'] as $r): ?><option value="<?= $r ?>"><?= ucfirst($r) ?></option><?php endforeach; ?></select></div>
+                                <div class="col-md-6"><label class="form-label">Rôle</label><select class="form-select" name="role" id="edit_role"><?php foreach (['admin', 'gerant', 'commercial', 'comptable'] as $r): ?><option value="<?= $r ?>"><?= htmlspecialchars(roleLabel($r)) ?></option><?php endforeach; ?></select></div>
                                 <div class="col-md-6"><label class="form-label">Dépôt</label><select class="form-select" name="depot_id" id="edit_depot">
                                         <option value="">—</option><?php foreach ($depots as $d): ?><option value="<?= (int)$d['id'] ?>"><?= htmlspecialchars($d['nom']) ?></option><?php endforeach; ?>
                                     </select></div>
@@ -313,8 +320,8 @@ include 'includes/header.php';
 <div id="users-config"
     data-role-defaults='<?= json_encode([
                             'admin' => getRolePermissions('admin'),
-                            'vendeur' => getRolePermissions('vendeur'),
-                            'livreur' => getRolePermissions('livreur'),
+                            'gerant' => getRolePermissions('gerant'),
+                            'commercial' => getRolePermissions('commercial'),
                             'comptable' => getRolePermissions('comptable'),
                         ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>'
     data-user-overrides='<?= json_encode($permMap, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>'>

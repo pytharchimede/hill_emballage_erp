@@ -409,7 +409,7 @@
     </style>
 </head>
 
-<body class="role-<?= $_SESSION['user_role'] ?? 'guest' ?>">
+<body class="role-<?= normalizeRole($_SESSION['user_role'] ?? 'guest') ?>">
     <!-- jQuery (certaines pages peuvent l'utiliser) -->
     <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
     <!-- Bootstrap JS (popups/modals) -->
@@ -468,15 +468,15 @@
             </div>
             <div class="user-info">
                 <span class="user-role">
-                    <i class="fas fa-user"></i> <?= ucfirst($_SESSION['user_role']) ?>
+                    <i class="fas fa-user"></i> <?= htmlspecialchars(roleLabel($_SESSION['user_role'] ?? '')) ?>
                 </span>
                 <?php
                 $__depId = (int)($_SESSION['depot_id'] ?? 0);
                 $__current = isLoggedIn() ? (getCurrentUser() ?: null) : null;
                 $__depotNom = $__current['depot_nom'] ?? null;
-                $__role = $_SESSION['user_role'] ?? '';
+                $__role = normalizeRole($_SESSION['user_role'] ?? '');
                 $__isMain = ($__depId > 0) && isMainDepot($__depId);
-                $__isRestricted = (!$__isMain) && in_array($__role, ['vendeur', 'comptable', 'livreur'], true);
+                $__isRestricted = (!$__isMain) && in_array($__role, ['commercial', 'comptable'], true);
                 ?>
                 <?php if ($__isMain): ?>
                     <span class="badge-main-depot" title="Accès global (dépôt principal)"><i class="fas fa-star"></i> Dépôt principal</span>

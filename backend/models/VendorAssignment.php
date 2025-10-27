@@ -89,7 +89,11 @@ class VendorAssignment
         try {
             $this->conn->beginTransaction();
             $updStock = $this->conn->prepare("UPDATE stock SET quantite_reservee = quantite_reservee - ?, quantite_disponible = quantite_disponible + ? WHERE depot_id = ? AND product_id = ? AND quantite_reservee >= ?");
-            $updDetail = $this->conn->prepare("UPDATE {$this->detailsTable} SET qty_returned = qty_returned + ? WHERE assignment_id = ? AND product_id = ?");
+            // Ne pas dépasser le reste sur la ligne d'assignation
+            $updDetail = $this->conn->prepare("UPDATE {$this->detailsTable}
+                                               SET qty_returned = qty_returned + ?
+                                               WHERE assignment_id = ? AND product_id = ?
+                                               AND (qty_assigned - qty_sold - qty_returned) >= ?");
             $totalReturned = 0;
             foreach ($returns as $r) {
                 $pid = (int)$r['product_id'];
@@ -99,7 +103,10 @@ class VendorAssignment
                 if (!$ok || $updStock->rowCount() === 0) {
                     throw new Exception("Réserve insuffisante à libérer pour le produit #$pid");
                 }
-                $updDetail->execute([$q, $assignment_id, $pid]);
+                $updDetail->execute([$q, $assignment_id, $pid, $q]);
+                if ($updDetail->rowCount() === 0) {
+                    throw new Exception("Retour dépasse le restant autorisé pour le produit #$pid");
+                }
                 $totalReturned += $q;
             }
             if ($totalReturned > 0) {

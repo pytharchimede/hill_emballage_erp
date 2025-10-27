@@ -200,8 +200,28 @@ function log_action($action, $entity = null, $entityId = null, $details = null)
     }
 }
 
+function normalizeRole($role)
+{
+    // Unifier les anciens profils 'vendeur' et 'livreur' en 'commercial'
+    if (in_array($role, ['vendeur', 'livreur'], true)) return 'commercial';
+    return $role;
+}
+
+function roleLabel($role)
+{
+    $role = normalizeRole($role);
+    $labels = [
+        'admin' => 'Administrateur',
+        'gerant' => 'Gérant',
+        'commercial' => 'Commercial',
+        'comptable' => 'Comptable',
+    ];
+    return $labels[$role] ?? ucfirst($role);
+}
+
 function getMenuForRole($role)
 {
+    $role = normalizeRole($role);
     $menus = [
         'admin' => [
             'dashboard' => ['icon' => 'fas fa-tachometer-alt', 'title' => 'Tableau de bord', 'url' => BASE_URL . '/web_admin/dashboard.php'],
@@ -219,8 +239,8 @@ function getMenuForRole($role)
             'livreur_state' => ['icon' => 'fas fa-user-check', 'title' => 'Etat Livreur (J)', 'url' => BASE_URL . '/app/livreur_state.php'],
             'depot_state' => ['icon' => 'fas fa-warehouse', 'title' => 'Etat Dépôt (J)', 'url' => BASE_URL . '/app/depot_state.php'],
             'system_state' => ['icon' => 'fas fa-sitemap', 'title' => 'Etat Général', 'url' => BASE_URL . '/app/system_state.php'],
-            'assignments' => ['icon' => 'fas fa-route', 'title' => 'Assignations', 'url' => BASE_URL . '/web_admin/assignments.php'],
-            'vendor_balance' => ['icon' => 'fas fa-scale-balanced', 'title' => 'Soldes Vendeurs', 'url' => BASE_URL . '/web_admin/vendor_balance.php'],
+            'assignments' => ['icon' => 'fas fa-route', 'title' => 'Distributions', 'url' => BASE_URL . '/app/assignments.php'],
+            'vendor_balance' => ['icon' => 'fas fa-scale-balanced', 'title' => 'Soldes Commerciaux', 'url' => BASE_URL . '/app/vendor_balance.php'],
             'users' => ['icon' => 'fas fa-user-cog', 'title' => 'Utilisateurs', 'url' => BASE_URL . '/web_admin/users.php'],
             'profile' => ['icon' => 'fas fa-user-circle', 'title' => 'Mon profil', 'url' => BASE_URL . '/web_admin/profile.php'],
         ],
@@ -233,42 +253,19 @@ function getMenuForRole($role)
             'livreur_state' => ['icon' => 'fas fa-user-check', 'title' => 'Etat Livreur (J)', 'url' => BASE_URL . '/app/livreur_state.php'],
             'depot_state' => ['icon' => 'fas fa-warehouse', 'title' => 'Etat Dépôt (J)', 'url' => BASE_URL . '/app/depot_state.php'],
             'system_state' => ['icon' => 'fas fa-sitemap', 'title' => 'Etat Général', 'url' => BASE_URL . '/app/system_state.php'],
-            'assignments' => ['icon' => 'fas fa-route', 'title' => 'Assignations', 'url' => BASE_URL . '/web_admin/assignments.php'],
-            'vendor_balance' => ['icon' => 'fas fa-scale-balanced', 'title' => 'Soldes Vendeurs', 'url' => BASE_URL . '/web_admin/vendor_balance.php'],
-            'users' => ['icon' => 'fas fa-user-cog', 'title' => 'Utilisateurs', 'url' => BASE_URL . '/web_admin/users.php'],
+            'assignments' => ['icon' => 'fas fa-route', 'title' => 'Distributions', 'url' => BASE_URL . '/app/assignments.php'],
+            'vendor_balance' => ['icon' => 'fas fa-scale-balanced', 'title' => 'Soldes Commerciaux', 'url' => BASE_URL . '/app/vendor_balance.php'],
             'profile' => ['icon' => 'fas fa-user-circle', 'title' => 'Mon profil', 'url' => BASE_URL . '/web_admin/profile.php'],
         ],
         'commercial' => [
             'dashboard' => ['icon' => 'fas fa-tachometer-alt', 'title' => 'Tableau de bord', 'url' => BASE_URL . '/web_admin/vendeur.php'],
             'clients' => ['icon' => 'fas fa-users', 'title' => 'Clients', 'url' => BASE_URL . '/web_admin/clients.php'],
             'sales' => ['icon' => 'fas fa-shopping-cart', 'title' => 'Ventes', 'url' => BASE_URL . '/app/sales.php'],
-            'deliveries' => ['icon' => 'fas fa-truck', 'title' => 'Livraisons', 'url' => BASE_URL . '/web_admin/deliveries.php'],
+            'quick_sale' => ['icon' => 'fas fa-bolt', 'title' => 'Vente rapide', 'url' => BASE_URL . '/app/quick_sale.php'],
             'stock_view' => ['icon' => 'fas fa-eye', 'title' => 'Consulter Stock', 'url' => BASE_URL . '/web_admin/stock.php'],
             'livreur_state' => ['icon' => 'fas fa-user-check', 'title' => 'Mon état journalier', 'url' => BASE_URL . '/app/livreur_state.php'],
-            'assignments' => ['icon' => 'fas fa-route', 'title' => 'Mes assignations', 'url' => BASE_URL . '/web_admin/assignments.php'],
-            'vendor_balance' => ['icon' => 'fas fa-scale-balanced', 'title' => 'Mon solde vendeur', 'url' => BASE_URL . '/web_admin/vendor_balance.php'],
-            'profile' => ['icon' => 'fas fa-user-circle', 'title' => 'Mon profil', 'url' => BASE_URL . '/web_admin/profile.php'],
-        ],
-        'vendeur' => [
-            'dashboard' => ['icon' => 'fas fa-tachometer-alt', 'title' => 'Tableau de bord', 'url' => BASE_URL . '/web_admin/vendeur.php'],
-            'clients' => ['icon' => 'fas fa-users', 'title' => 'Clients', 'url' => BASE_URL . '/web_admin/clients.php'],
-            'sales' => ['icon' => 'fas fa-shopping-cart', 'title' => 'Ventes', 'url' => BASE_URL . '/app/sales.php'],
-            'stock_view' => ['icon' => 'fas fa-eye', 'title' => 'Consulter Stock', 'url' => BASE_URL . '/web_admin/stock.php'],
-            'my_sales' => ['icon' => 'fas fa-list', 'title' => 'Mes Ventes', 'url' => BASE_URL . '/app/sales.php?mine=1'],
-            'my_activity' => ['icon' => 'fas fa-user-clock', 'title' => 'Mon activité', 'url' => BASE_URL . '/web_admin/my-activity.php'],
-            'assignments' => ['icon' => 'fas fa-route', 'title' => 'Mes assignations', 'url' => BASE_URL . '/web_admin/assignments.php'],
-            'vendor_balance' => ['icon' => 'fas fa-scale-balanced', 'title' => 'Mon solde vendeur', 'url' => BASE_URL . '/web_admin/vendor_balance.php'],
-            'profile' => ['icon' => 'fas fa-user-circle', 'title' => 'Mon profil', 'url' => BASE_URL . '/web_admin/profile.php'],
-        ],
-        'livreur' => [
-            'dashboard' => ['icon' => 'fas fa-tachometer-alt', 'title' => 'Tableau de bord', 'url' => BASE_URL . '/web_admin/livreur.php'],
-            'deliveries' => ['icon' => 'fas fa-truck', 'title' => 'Livraisons', 'url' => BASE_URL . '/web_admin/deliveries.php'],
-            // Retiré à la demande: transfers, ajustements, entrées de stock
-            'stock' => ['icon' => 'fas fa-warehouse', 'title' => 'Stock', 'url' => BASE_URL . '/web_admin/stock.php'],
-            'livreur_state' => ['icon' => 'fas fa-user-check', 'title' => 'Mon état journalier', 'url' => BASE_URL . '/app/livreur_state.php'],
-            'assignments' => ['icon' => 'fas fa-route', 'title' => 'Mes assignations', 'url' => BASE_URL . '/web_admin/assignments.php'],
-            'vendor_balance' => ['icon' => 'fas fa-scale-balanced', 'title' => 'Mon solde vendeur', 'url' => BASE_URL . '/web_admin/vendor_balance.php'],
-            'my_activity' => ['icon' => 'fas fa-user-clock', 'title' => 'Mon activité', 'url' => BASE_URL . '/web_admin/my-activity.php'],
+            'assignments' => ['icon' => 'fas fa-route', 'title' => 'Mes distributions', 'url' => BASE_URL . '/app/assignments.php'],
+            'vendor_balance' => ['icon' => 'fas fa-scale-balanced', 'title' => 'Mon solde', 'url' => BASE_URL . '/app/vendor_balance.php'],
             'profile' => ['icon' => 'fas fa-user-circle', 'title' => 'Mon profil', 'url' => BASE_URL . '/web_admin/profile.php'],
         ],
         'comptable' => [
@@ -291,6 +288,7 @@ function getMenuForRole($role)
 
 function getRolePermissions($role)
 {
+    $role = normalizeRole($role);
     $permissions = [
         'admin' => [
             'read',
@@ -350,33 +348,6 @@ function getRolePermissions($role)
             'clients_update',
             'sales_read',
             'sales_create',
-            'deliveries_read',
-            'deliveries_update',
-            'stock_read',
-            'products_read',
-            'assignments_view'
-        ],
-        'vendeur' => [
-            'read',
-            'write_sales',
-            'read_clients',
-            'write_clients',
-            'clients_read',
-            'clients_create',
-            'clients_update',
-            'sales_read',
-            'sales_create',
-            'stock_read',
-            'products_read',
-            'assignments_view'
-        ],
-        'livreur' => [
-            'read',
-            'update_deliveries',
-            'read_stock',
-            'write_stock',
-            'deliveries_read',
-            'deliveries_update',
             'stock_read',
             'products_read',
             'assignments_view'
