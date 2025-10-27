@@ -169,7 +169,7 @@ class VendorAssignment
 
             // Solde vendeur: on considère que le crédit non encaissé est dû par le vendeur (à régulariser plus tard)
             // balance += creditOutstanding - (cashPaid - cashExpected) ; mais on suppose cashPaid == cashExpected attendu pour éviter écart
-            $this->upsertVendorBalance($vendeur_id, $creditOutstanding, 'assignment_close');
+            $this->upsertVendorBalance($vendeur_id, $creditOutstanding, 'assignment_close', $assignment_id);
 
             $this->conn->commit();
             return true;
@@ -179,14 +179,14 @@ class VendorAssignment
         }
     }
 
-    private function upsertVendorBalance($vendeur_id, $delta, $reason)
+    private function upsertVendorBalance($vendeur_id, $delta, $reason, $assignment_id = null)
     {
         // Upsert
         $stmt = $this->conn->prepare("INSERT INTO {$this->balancesTable} (vendeur_id, balance) VALUES (?, ?) ON DUPLICATE KEY UPDATE balance = balance + VALUES(balance)");
         $stmt->execute([(int)$vendeur_id, (float)$delta]);
         // Historique
-        $hist = $this->conn->prepare("INSERT INTO {$this->balanceHistoryTable} (vendeur_id, assignment_id, change_amount, reason) VALUES (?, NULL, ?, ?)");
-        $hist->execute([(int)$vendeur_id, (float)$delta, substr($reason, 0, 100)]);
+        $hist = $this->conn->prepare("INSERT INTO {$this->balanceHistoryTable} (vendeur_id, assignment_id, change_amount, reason) VALUES (?, ?, ?, ?)");
+        $hist->execute([(int)$vendeur_id, $assignment_id !== null ? (int)$assignment_id : null, (float)$delta, substr($reason, 0, 100)]);
     }
 
     public function getOpenByVendeur($vendeur_id)
