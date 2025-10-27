@@ -112,6 +112,23 @@ class Client
     }
 
     /**
+     * Lire les clients créés par un utilisateur (pour que le livreur voie ses clients)
+     */
+    public function readByCreator($user_id)
+    {
+        $sql = "SELECT c.*, u.full_name as created_by_name 
+                FROM " . $this->table . " c
+                LEFT JOIN users u ON c.created_by = u.id
+                WHERE c.is_active = 1 AND c.created_by = ?
+                ORDER BY c.nom ASC";
+
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute([(int)$user_id]);
+
+        return $stmt;
+    }
+
+    /**
      * Lire un client par ID
      */
     public function readOne()

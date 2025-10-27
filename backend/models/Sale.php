@@ -14,6 +14,7 @@ class Sale
     public $client_id;
     public $depot_id;
     public $vendeur_id;
+    public $assignment_id; // nouvelle référence vers une assignation vendeur
     public $type_vente;
     public $montant_total;
     public $montant_paye;
@@ -64,6 +65,7 @@ class Sale
                         client_id = :client_id,
                         depot_id = :depot_id,
                         vendeur_id = :vendeur_id,
+                        assignment_id = :assignment_id,
                         type_vente = :type_vente,
                         montant_total = :montant_total,
                         montant_paye = :montant_paye,
@@ -82,6 +84,7 @@ class Sale
             $stmt->bindParam(':client_id', $this->client_id);
             $stmt->bindParam(':depot_id', $this->depot_id);
             $stmt->bindParam(':vendeur_id', $this->vendeur_id);
+            $stmt->bindParam(':assignment_id', $this->assignment_id);
             $stmt->bindParam(':type_vente', $this->type_vente);
             $stmt->bindParam(':montant_total', $this->montant_total);
             $stmt->bindParam(':montant_paye', $this->montant_paye);
@@ -100,6 +103,9 @@ class Sale
 
             // Mise à jour du stock
             $this->updateStock();
+
+            // Si la vente est liée à une assignation vendeur, mettre à jour le suivi d'assignation
+            $this->updateAssignmentTracking();
 
             // Mise à jour du solde client si vente à crédit
             if ($this->type_vente == 'credit' && $this->montant_restant > 0) {
@@ -142,17 +148,61 @@ class Sale
      */
     private function updateStock()
     {
-        $sql = "UPDATE stock SET quantite_disponible = quantite_disponible - ? 
-                WHERE depot_id = ? AND product_id = ?";
-        $stmt = $this->conn->prepare($sql);
-
-        foreach ($this->details as $detail) {
-            $stmt->execute([
-                $detail['quantite'],
-                $this->depot_id,
-                $detail['product_id']
-            ]);
+        // Si la vente provient d'une assignation vendeur, on consomme d'abord la réserve
+        if (!empty($this->assignment_id)) {
+            $sql = "UPDATE stock SET quantite_reservee = quantite_reservee - ? 
+                    WHERE depot_id = ? AND product_id = ? AND quantite_reservee >= ?";
+            $stmt = $this->conn->prepare($sql);
+            foreach ($this->details as $detail) {
+                $stmt->execute([
+                    $detail['quantite'],
+                    $this->depot_id,
+                    $detail['product_id'],
+                    $detail['quantite']
+                ]);
+            }
+        } else {
+            // Vente standard: on décrémente le stock disponible
+            $sql = "UPDATE stock SET quantite_disponible = quantite_disponible - ? 
+                    WHERE depot_id = ? AND product_id = ?";
+            $stmt = $this->conn->prepare($sql);
+            foreach ($this->details as $detail) {
+                $stmt->execute([
+                    $detail['quantite'],
+                    $this->depot_id,
+                    $detail['product_id']
+                ]);
+            }
         }
+    }
+
+    /**
+     * Mettre à jour l'assignation (quantités vendues et montants agrégés)
+     */
+    private function updateAssignmentTracking()
+    {
+        if (empty($this->assignment_id)) {
+            return;
+        }
+
+        // Mettre à jour les quantités vendues par produit dans vendor_assignment_details
+        $upd = $this->conn->prepare("UPDATE vendor_assignment_details SET qty_sold = qty_sold + ? WHERE assignment_id = ? AND product_id = ?");
+        $qtySoldTotal = 0;
+        foreach ($this->details as $detail) {
+            $q = (float)$detail['quantite'];
+            $pid = (int)$detail['product_id'];
+            $upd->execute([$q, (int)$this->assignment_id, $pid]);
+            $qtySoldTotal += $q;
+        }
+
+        // Mettre à jour les montants cumulés
+        $agg = $this->conn->prepare("UPDATE vendor_assignments SET qty_sold = qty_sold + ?, amount_cash_collected = amount_cash_collected + ?, amount_credit_outstanding = amount_credit_outstanding + ? WHERE id = ?");
+        $agg->execute([
+            $qtySoldTotal,
+            (float)$this->montant_paye,
+            (float)$this->montant_restant,
+            (int)$this->assignment_id
+        ]);
     }
 
     /**

@@ -185,6 +185,20 @@ class Stock
     }
 
     /**
+     * Consommer uniquement la réserve (lors d'une vente issue d'une assignation)
+     */
+    public function consommerReserve($depot_id, $product_id, $quantite)
+    {
+        $sql = "UPDATE " . $this->table . " 
+                SET quantite_reservee = quantite_reservee - ?
+                WHERE depot_id = ? AND product_id = ? AND quantite_reservee >= ?";
+
+        $stmt = $this->conn->prepare($sql);
+
+        return $stmt->execute([$quantite, $depot_id, $product_id, $quantite]);
+    }
+
+    /**
      * Effectuer un inventaire
      */
     public function inventaire($depot_id, $product_id, $nouvelle_quantite, $user_id, $notes = '')
