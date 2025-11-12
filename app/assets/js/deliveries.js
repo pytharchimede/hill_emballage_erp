@@ -202,7 +202,7 @@
         if (it.is_geo) {
           const lat = parseFloat(it.lat),
             lon = parseFloat(it.lon);
-          const mk = L.circleMarker([lat, lon], {
+          L.circleMarker([lat, lon], {
             radius: 9,
             color: colorForStatus(it.statut),
             fillColor: colorForStatus(it.statut),
@@ -214,7 +214,6 @@
     }
     // signature pad
     if (dlSigCanvas && window.SignaturePad) {
-      // resize canvas to container
       const parent = dlSigCanvas.parentElement;
       if (parent) {
         dlSigCanvas.width = parent.clientWidth - 2;
@@ -255,25 +254,60 @@
           return;
         }
         const dataURL = sigPad.toDataURL("image/png");
-        const blob = await (await fetch(dataURL)).blob();
+        // Conversion locale du dataURL en Blob (évite fetch bloqué par CSP)
+        const base64 = dataURL.split(",")[1];
+        const binary = atob(base64);
+        const len = binary.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) bytes[i] = binary.charCodeAt(i);
+        const blob = new Blob([bytes], { type: "image/png" });
         const fd = new FormData();
         fd.append("entity", "ventes");
         fd.append("entity_id", id);
-        fd.append("redirect", `${BASE}/web_admin/deliveries.php`);
+        // Forcer une réponse JSON (éviter PRG qui renvoie 302)
+        fd.append("redirect", "");
         fd.append("format", "json");
         fd.append("file", blob, `signature_${id}.png`);
         const resp = await fetch(`${BASE}/app/api/upload_attachment.php`, {
           method: "POST",
           body: fd,
+          credentials: "same-origin",
         });
-        const j = await resp.json();
+        let j;
+        try {
+          j = await resp.json();
+        } catch (parseErr) {
+          const txt = await resp.text();
+          showToast(
+            `Signature: réponse invalide (${resp.status}) ${txt.slice(0, 80)}`,
+            "error"
+          );
+          return;
+        }
         if (!j.ok) {
-          showToast("Échec de sauvegarde de la signature.", "error");
+          const dbg = j.debug
+            ? ` [role=${
+                j.debug.role || j.debug.user_role || "n/a"
+              } perms=${Object.keys(j.debug)
+                .map((k) => `${k}=${j.debug[k]}`)
+                .join(",")}]`
+            : "";
+          showToast(
+            j.error
+              ? `Signature: ${j.error}${dbg}`
+              : "Échec de sauvegarde de la signature.",
+            "error"
+          );
           return;
         }
         showToast("Signature enregistrée.", "success");
       } catch (e) {
-        showToast("Erreur pendant la sauvegarde.", "error");
+        showToast(
+          e?.message
+            ? `Signature: ${e.message}`
+            : "Erreur pendant la sauvegarde.",
+          "error"
+        );
       }
     });
   }
@@ -288,17 +322,41 @@
         const r = await fetch(`${BASE}/app/api/confirm_delivery.php`, {
           method: "POST",
           body: fd,
+          credentials: "same-origin",
         });
-        const j = await r.json();
+        let j;
+        try {
+          j = await r.json();
+        } catch (parseErr) {
+          const txt = await r.text();
+          showToast(
+            `Confirmation: réponse invalide (${r.status}) ${txt.slice(0, 80)}`,
+            "error"
+          );
+          return;
+        }
         if (!j.ok) {
-          showToast("Échec de confirmation.", "error");
+          const dbg = j.debug
+            ? ` [role=${j.debug.user_role || "n/a"} deliveries=${
+                j.debug.deliveries_update
+              } sales=${j.debug.sales_update}]`
+            : "";
+          showToast(
+            j.error
+              ? `Confirmation: ${j.error}${dbg}`
+              : "Échec de confirmation.",
+            "error"
+          );
           return;
         }
         if (modal && modal.hide) modal.hide();
         loadData();
         showToast("Livraison confirmée.", "success");
       } catch (e) {
-        showToast("Erreur de confirmation.", "error");
+        showToast(
+          e?.message ? `Confirmation: ${e.message}` : "Erreur de confirmation.",
+          "error"
+        );
       }
     });
   }

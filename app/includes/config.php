@@ -4,7 +4,16 @@
  * Configuration et fonctions globales de l'application
  */
 
-session_start();
+// Démarrage de la session (éviter l'avertissement Intelephense P1008 sur $_SESSION)
+if (session_status() !== PHP_SESSION_ACTIVE) {
+    session_start();
+}
+/**
+ * Astuce pour certains analyseurs statiques (Intelephense) qui signalent parfois
+ * P1008 "Undefined variable $_SESSION" avant interception des superglobales.
+ * On documente le type attendu sans réaffecter la superglobale.
+ * @var array<string,mixed> $_SESSION
+ */
 
 // Définir des chemins/URLs de base pour réutilisation entre app/ et web_admin/
 define('ROOT_PATH', realpath(__DIR__ . '/..')); // c:\wamp\www\hill\app
@@ -69,7 +78,8 @@ function requireLogin()
 function requireRole($allowedRoles)
 {
     requireLogin();
-    if (!in_array($_SESSION['user_role'], $allowedRoles)) {
+    /** @var array<string,mixed> $_SESSION */
+    if (!in_array($GLOBALS['_SESSION']['user_role'] ?? null, $allowedRoles)) {
         // Message et redirection propre si rôle non autorisé
         setFlashMessage('warning', "Accès refusé pour votre rôle.");
         header('Location: ' . BASE_URL . '/web_admin/dashboard.php');
@@ -86,7 +96,7 @@ function getCurrentUser()
             LEFT JOIN depots d ON u.depot_id = d.id 
             WHERE u.id = ?";
     $stmt = $db->prepare($sql);
-    $stmt->execute([$_SESSION['user_id']]);
+    $stmt->execute([$GLOBALS['_SESSION']['user_id'] ?? null]);
     return $stmt->fetch(PDO::FETCH_ASSOC);
 }
 
@@ -202,21 +212,24 @@ function log_action($action, $entity = null, $entityId = null, $details = null)
 
 function normalizeRole($role)
 {
-    // Unifier les anciens profils 'vendeur' et 'livreur' en 'commercial'
-    if (in_array($role, ['vendeur', 'livreur'], true)) return 'commercial';
+    // Unifier uniquement l'ancien profil 'vendeur' vers 'commercial'.
+    // On garde désormais 'livreur' distinct afin de lui attribuer des droits spécifiques (deliveries_update).
+    if ($role === 'vendeur') return 'commercial';
     return $role;
 }
 
 function roleLabel($role)
 {
-    $role = normalizeRole($role);
+    $norm = normalizeRole($role);
     $labels = [
         'admin' => 'Administrateur',
         'gerant' => 'Gérant',
         'commercial' => 'Commercial',
+        'livreur' => 'Livreur',
         'comptable' => 'Comptable',
     ];
-    return $labels[$role] ?? ucfirst($role);
+    // Afficher le label original si distinct (ex: livreur) sinon label normalisé
+    return $labels[$role] ?? ($labels[$norm] ?? ucfirst($norm));
 }
 
 function getMenuForRole($role)
@@ -266,6 +279,17 @@ function getMenuForRole($role)
             'livreur_state' => ['icon' => 'fas fa-user-check', 'title' => 'Mon état journalier', 'url' => BASE_URL . '/app/livreur_state.php'],
             'assignments' => ['icon' => 'fas fa-route', 'title' => 'Mes distributions', 'url' => BASE_URL . '/app/assignments.php'],
             'vendor_balance' => ['icon' => 'fas fa-scale-balanced', 'title' => 'Mon solde', 'url' => BASE_URL . '/app/vendor_balance.php'],
+            'profile' => ['icon' => 'fas fa-user-circle', 'title' => 'Mon profil', 'url' => BASE_URL . '/web_admin/profile.php'],
+        ],
+        'livreur' => [
+            'dashboard' => ['icon' => 'fas fa-tachometer-alt', 'title' => 'Tableau de bord', 'url' => BASE_URL . '/web_admin/livreur.php'],
+            'clients' => ['icon' => 'fas fa-users', 'title' => 'Clients', 'url' => BASE_URL . '/web_admin/clients.php'],
+            'sales' => ['icon' => 'fas fa-shopping-cart', 'title' => 'Ventes', 'url' => BASE_URL . '/app/sales.php'],
+            'quick_sale' => ['icon' => 'fas fa-bolt', 'title' => 'Vente rapide', 'url' => BASE_URL . '/app/quick_sale.php'],
+            'assignments' => ['icon' => 'fas fa-route', 'title' => 'Distributions', 'url' => BASE_URL . '/app/assignments.php'],
+            'stock_view' => ['icon' => 'fas fa-eye', 'title' => 'Consulter Stock', 'url' => BASE_URL . '/web_admin/stock.php'],
+            'deliveries' => ['icon' => 'fas fa-truck', 'title' => 'Livraisons', 'url' => BASE_URL . '/web_admin/deliveries.php'],
+            'livreur_state' => ['icon' => 'fas fa-user-check', 'title' => 'Mon état journalier', 'url' => BASE_URL . '/app/livreur_state.php'],
             'profile' => ['icon' => 'fas fa-user-circle', 'title' => 'Mon profil', 'url' => BASE_URL . '/web_admin/profile.php'],
         ],
         'comptable' => [
@@ -348,9 +372,21 @@ function getRolePermissions($role)
             'clients_update',
             'sales_read',
             'sales_create',
+            'deliveries_update',
             'stock_read',
             'products_read',
             'assignments_view'
+        ],
+        // Nouveau: rôle livreur séparé (ne doit PAS avoir les droits vendeur étendus)
+        'livreur' => [
+            'read',
+            'clients_read',        // Voir fiches clients nécessaires aux livraisons
+            'sales_read',          // Voir ventes à livrer
+            'sales_create',        // Créer une vente directe (si logique terrain)
+            'stock_read',          // Consulter stock affecté
+            'assignments_view',    // Voir ses distributions éventuelles
+            'deliveries_update',   // Confirmer livraisons / joindre pièces
+            'payments_read',       // Voir paiements liés aux ventes livrées
         ],
         'comptable' => [
             'read',
@@ -379,7 +415,7 @@ function hasPermission($permission)
         $overrideCache = [];
         try {
             $stmt = $db->prepare("SELECT permission, allowed FROM user_permissions WHERE user_id = ?");
-            $stmt->execute([$_SESSION['user_id']]);
+            $stmt->execute([$GLOBALS['_SESSION']['user_id'] ?? 0]);
             while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
                 $overrideCache[$row['permission']] = (int)$row['allowed']; // 1 autorise, 0 refuse
             }
@@ -392,7 +428,8 @@ function hasPermission($permission)
         return $overrideCache[$permission] === 1;
     }
     // Sinon, retomber sur les permissions du rôle
-    $rolePerms = getRolePermissions($_SESSION['user_role']);
+    $rawRole = $GLOBALS['_SESSION']['user_role'] ?? '';
+    $rolePerms = getRolePermissions(strtolower($rawRole));
     return in_array($permission, $rolePerms, true);
 }
 
