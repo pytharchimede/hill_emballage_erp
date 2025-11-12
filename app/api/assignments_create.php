@@ -51,7 +51,7 @@ try {
         exit;
     }
 
-    // Autorisations
+    // Autorisations de base
     $allowed = in_array($role, ['admin', 'gerant'], true) || hasPermission('assignments_manage');
     if (!$allowed) {
         if ($role === 'vendeur') {
@@ -95,6 +95,17 @@ try {
         exit;
     }
 
+    // Contrainte dépôt pour gérant non principal: ne peut créer que depuis son propre dépôt
+    $sessionDepotId = (int)($_SESSION['depot_id'] ?? 0);
+    $isMainDepotUser = $sessionDepotId > 0 && isMainDepot($sessionDepotId);
+    if ($role === 'gerant' && !$isMainDepotUser) {
+        if ($depot_id !== $sessionDepotId) {
+            http_response_code(403);
+            echo json_encode(['error' => 'invalid_depot']);
+            exit;
+        }
+    }
+
     // Enforcer que l'assigné est bien un commercial
     $colExists = function ($col) use ($db) {
         $q = $db->prepare("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME='users' AND COLUMN_NAME=?");
@@ -102,13 +113,29 @@ try {
         return ((int)$q->fetchColumn()) > 0;
     };
     $roleCol = $colExists('user_role') ? 'user_role' : 'role';
-    $st = $db->prepare("SELECT $roleCol AS role FROM users WHERE id = ?");
+    $st = $db->prepare("SELECT $roleCol AS role, depot_id FROM users WHERE id = ?");
     $st->execute([$vendeur_id]);
     $assignee = $st->fetch(PDO::FETCH_ASSOC);
     if (!$assignee || normalizeRole($assignee['role'] ?? '') !== 'commercial') {
         http_response_code(400);
         echo json_encode(['error' => 'assignee_must_be_commercial']);
         exit;
+    }
+
+    // Si colonne depot_id existe, et gérant non-principal: imposer même dépôt pour l'assigné
+    try {
+        $colChk = $db->prepare("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME='users' AND COLUMN_NAME='depot_id'");
+        $colChk->execute();
+        $hasDepotCol = ((int)$colChk->fetchColumn()) > 0;
+    } catch (Throwable $e) {
+        $hasDepotCol = false;
+    }
+    if ($role === 'gerant' && !$isMainDepotUser && $hasDepotCol) {
+        if ((int)($assignee['depot_id'] ?? 0) !== $sessionDepotId) {
+            http_response_code(403);
+            echo json_encode(['error' => 'assignee_invalid_depot']);
+            exit;
+        }
     }
 
     $service = new VendorAssignment($db);

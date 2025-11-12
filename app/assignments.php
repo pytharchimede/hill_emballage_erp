@@ -59,7 +59,18 @@ include __DIR__ . '/includes/header.php';
         <form id="createForm" class="row g-3">
             <?php
             // Charger dépôts et utilisateurs (assignee) pour le formulaire
-            $depots = $db->query("SELECT id, nom FROM depots WHERE is_active=1 ORDER BY nom")->fetchAll(PDO::FETCH_ASSOC);
+            // Si gérant rattaché à un dépôt non principal, restreindre au dépôt de la gérante
+            $depots = [];
+            $current = getCurrentUser();
+            $userDepotId = (int)($current['depot_id'] ?? 0);
+            $restrictDepot = (in_array($role, ['gerant'], true) && $userDepotId > 0 && !isMainDepot($userDepotId));
+            if ($restrictDepot) {
+                $stDep = $db->prepare("SELECT id, nom FROM depots WHERE is_active=1 AND id=? ORDER BY nom");
+                $stDep->execute([$userDepotId]);
+                $depots = $stDep->fetchAll(PDO::FETCH_ASSOC);
+            } else {
+                $depots = $db->query("SELECT id, nom FROM depots WHERE is_active=1 ORDER BY nom")->fetchAll(PDO::FETCH_ASSOC);
+            }
 
             // Détecter colonnes existantes sur users (compat schémas différents)
             $colExists = function ($col) use ($db) {
@@ -378,6 +389,11 @@ include __DIR__ . '/includes/header.php';
             $('#vendeurSelect').select2({
                 width: '100%'
             });
+            // Dépôt par défaut: si restreint, présélectionner
+            const depotSel = document.getElementById('depotSelect');
+            if (depotSel && depotSel.options.length === 1 && depotSel.options[0].value) {
+                depotSel.selectedIndex = 0; // unique option (hors placeholder)
+            }
         });
         // Template ligne produits (Select2 + qty + PU)
         function initProductSelect($el) {

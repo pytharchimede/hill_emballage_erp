@@ -18,6 +18,17 @@ class VendorAssignment
         $this->conn = $db;
     }
 
+    private function columnExists($table, $col)
+    {
+        try {
+            $s = $this->conn->prepare("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?");
+            $s->execute([$table, $col]);
+            return ((int)$s->fetchColumn()) > 0;
+        } catch (Exception $e) {
+            return false;
+        }
+    }
+
     private function generateNumber()
     {
         $date = date('Ymd');
@@ -48,17 +59,33 @@ class VendorAssignment
             $stmt->execute([$numero, $depot_id, $vendeur_id, $assigner_id, $notes]);
             $assignment_id = (int)$this->conn->lastInsertId();
 
+            // Déterminer les colonnes de stock disponibles
+            $hasQuantiteDisponible = $this->columnExists('stock', 'quantite_disponible');
+            $hasQuantiteReservee = $this->columnExists('stock', 'quantite_reservee');
+            $availableCol = $hasQuantiteDisponible ? 'quantite_disponible' : 'quantite';
+
             // Réserver le stock et créer les détails
             $totalQty = 0;
             $ins = $this->conn->prepare("INSERT INTO {$this->detailsTable} (assignment_id, product_id, qty_assigned, unit_price) VALUES (?, ?, ?, ?)");
-            $reserve = $this->conn->prepare("UPDATE stock SET quantite_disponible = quantite_disponible - ?, quantite_reservee = quantite_reservee + ? WHERE depot_id = ? AND product_id = ? AND quantite_disponible >= ?");
+            // Requête de réservation dynamique suivant les colonnes existantes
+            if ($hasQuantiteReservee) {
+                $reserveSql = "UPDATE stock SET $availableCol = $availableCol - ?, quantite_reservee = quantite_reservee + ? WHERE depot_id = ? AND product_id = ? AND $availableCol >= ?";
+            } else {
+                // S'il n'y a pas de colonne de réserve, décrémenter seulement la quantité disponible
+                $reserveSql = "UPDATE stock SET $availableCol = $availableCol - ? WHERE depot_id = ? AND product_id = ? AND $availableCol >= ?";
+            }
+            $reserve = $this->conn->prepare($reserveSql);
             foreach ($details as $d) {
                 $pid = (int)$d['product_id'];
                 $q = (float)$d['quantite'];
                 $pu = isset($d['unit_price']) ? (float)$d['unit_price'] : null;
                 if ($q <= 0) continue;
                 // Réserver (contrôle quantité)
-                $ok = $reserve->execute([$q, $q, $depot_id, $pid, $q]);
+                if ($hasQuantiteReservee) {
+                    $ok = $reserve->execute([$q, $q, $depot_id, $pid, $q]);
+                } else {
+                    $ok = $reserve->execute([$q, $depot_id, $pid, $q]);
+                }
                 if (!$ok || $reserve->rowCount() === 0) {
                     throw new Exception("Stock insuffisant pour le produit #$pid");
                 }
@@ -88,7 +115,17 @@ class VendorAssignment
     {
         try {
             $this->conn->beginTransaction();
-            $updStock = $this->conn->prepare("UPDATE stock SET quantite_reservee = quantite_reservee - ?, quantite_disponible = quantite_disponible + ? WHERE depot_id = ? AND product_id = ? AND quantite_reservee >= ?");
+            // Déterminer les colonnes de stock disponibles
+            $hasQuantiteDisponible = $this->columnExists('stock', 'quantite_disponible');
+            $hasQuantiteReservee = $this->columnExists('stock', 'quantite_reservee');
+            $availableCol = $hasQuantiteDisponible ? 'quantite_disponible' : 'quantite';
+
+            if ($hasQuantiteReservee) {
+                $updStock = $this->conn->prepare("UPDATE stock SET quantite_reservee = quantite_reservee - ?, $availableCol = $availableCol + ? WHERE depot_id = ? AND product_id = ? AND quantite_reservee >= ?");
+            } else {
+                // Pas de réserve formelle: rien à décrémenter, simplement ré-incrémenter la quantité disponible
+                $updStock = $this->conn->prepare("UPDATE stock SET $availableCol = $availableCol + ? WHERE depot_id = ? AND product_id = ?");
+            }
             // Ne pas dépasser le reste sur la ligne d'assignation
             $updDetail = $this->conn->prepare("UPDATE {$this->detailsTable}
                                                SET qty_returned = qty_returned + ?
@@ -99,7 +136,11 @@ class VendorAssignment
                 $pid = (int)$r['product_id'];
                 $q = (float)$r['quantite'];
                 if ($q <= 0) continue;
-                $ok = $updStock->execute([$q, $q, $depot_id, $pid, $q]);
+                if ($hasQuantiteReservee) {
+                    $ok = $updStock->execute([$q, $q, $depot_id, $pid, $q]);
+                } else {
+                    $ok = $updStock->execute([$q, $depot_id, $pid]);
+                }
                 if (!$ok || $updStock->rowCount() === 0) {
                     throw new Exception("Réserve insuffisante à libérer pour le produit #$pid");
                 }

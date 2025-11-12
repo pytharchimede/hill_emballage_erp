@@ -4,7 +4,8 @@ if (!isLoggedIn()) {
     header('Location: login.php');
     exit();
 }
-if (!hasPermission('stock_update')) {
+// Ajustements d'inventaire: seulement depuis le dépôt principal
+if (!hasPermission('stock_update') || !isMainDepot((int)($_SESSION['depot_id'] ?? 0))) {
     setFlashMessage('warning', 'Accès refusé.');
     header('Location: dashboard.php');
     exit();

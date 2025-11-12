@@ -12,7 +12,7 @@ if (!hasPermission('stock_read')) {
 
 $userRole = $_SESSION['user_role'] ?? '';
 $userDepotId = (int)($_SESSION['depot_id'] ?? 0);
-$isRestricted = in_array($userRole, ['vendeur', 'comptable', 'livreur'], true) && $userDepotId > 0 && !isMainDepot($userDepotId);
+$isRestricted = in_array($userRole, ['vendeur', 'comptable', 'livreur', 'gerant'], true) && $userDepotId > 0 && !isMainDepot($userDepotId);
 
 $msg = '';
 $msgType = '';
@@ -121,7 +121,7 @@ $__depotNom = $__current['depot_nom'] ?? null;
             </span>
         <?php endif; ?>
     </h1>
-    <?php if (hasPermission('stock_update')): ?>
+    <?php if (hasPermission('stock_update') && isMainDepot($userDepotId)): ?>
         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#transferModal"><i class="fas fa-exchange-alt"></i> Transfert</button>
     <?php endif; ?>
 </div>
@@ -183,7 +183,7 @@ $__depotNom = $__current['depot_nom'] ?? null;
     </div>
 </div>
 
-<?php if (hasPermission('stock_update')): ?>
+<?php if (hasPermission('stock_update') && isMainDepot($userDepotId)): ?>
     <div class="modal fade" id="transferModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">

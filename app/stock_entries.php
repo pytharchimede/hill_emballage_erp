@@ -4,7 +4,8 @@ if (!isLoggedIn()) {
     header('Location: login.php');
     exit();
 }
-if (!hasPermission('stock_update')) {
+// Entrées de stock: uniquement par dépôt principal
+if (!hasPermission('stock_update') || !isMainDepot((int)($_SESSION['depot_id'] ?? 0))) {
     setFlashMessage('warning', 'Accès refusé.');
     header('Location: dashboard.php');
     exit();
@@ -78,8 +79,7 @@ $isMain = $userDepotId > 0 && isMainDepot($userDepotId);
 
 // Politique dépôts autorisés (sélection et POST):
 // - Admin du dépôt principal: tous les dépôts
-// - Admin d'un autre dépôt: uniquement son dépôt (jamais le dépôt principal)
-// - Autres rôles: uniquement leur dépôt
+// - Sinon: uniquement le dépôt de session (aucun accès au principal si non principal)
 if ($userRole === 'admin' && $isMain) {
     $depots = $db->query('SELECT id, nom FROM depots WHERE is_active=1 ORDER BY nom')->fetchAll(PDO::FETCH_ASSOC);
     $allowedDepotIds = array_map(fn($d) => (int)$d['id'], $depots);
