@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../app/includes/config.php';
+require_once __DIR__ . '/_auth.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
@@ -30,6 +31,8 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 try {
     global $db;
     $body = storefrontJsonBody();
+    $customer = storefrontCurrentCustomer($db, false);
+    $customerId = $customer ? (int)$customer['id'] : null;
 
     $firstName = trim((string)($body['first_name'] ?? ''));
     $lastName = trim((string)($body['last_name'] ?? ''));
@@ -41,6 +44,13 @@ try {
     $paymentMethod = trim((string)($body['payment_method'] ?? ''));
     $paymentChannel = trim((string)($body['payment_channel'] ?? ''));
     $items = $body['items'] ?? [];
+
+    if ($customer) {
+        if ($firstName === '') $firstName = trim((string)$customer['first_name']);
+        if ($lastName === '') $lastName = trim((string)$customer['last_name']);
+        if ($email === '') $email = trim((string)($customer['email'] ?? ''));
+        if ($phone === '') $phone = trim((string)($customer['phone'] ?? ''));
+    }
 
     if ($firstName === '' || $lastName === '' || !filter_var($email, FILTER_VALIDATE_EMAIL) || $phone === '' || $address === '' || $city === '') {
         http_response_code(422);
@@ -111,10 +121,10 @@ try {
 
     $db->beginTransaction();
     $stmt = $db->prepare(
-        'INSERT INTO storefront_orders (order_number, customer_first_name, customer_last_name, customer_email, customer_phone, delivery_address, delivery_city, delivery_note, subtotal, delivery_fee, total_amount, currency_code, payment_method, payment_channel, payment_status, order_status, payment_reference, payment_provider) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+        'INSERT INTO storefront_orders (customer_id, order_number, customer_first_name, customer_last_name, customer_email, customer_phone, delivery_address, delivery_city, delivery_note, subtotal, delivery_fee, total_amount, currency_code, payment_method, payment_channel, payment_status, order_status, payment_reference, payment_provider) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
     );
     $stmt->execute([
-        $orderNumber, $firstName, $lastName, $email, $phone, $address, $city, $note,
+        $customerId, $orderNumber, $firstName, $lastName, $email, $phone, $address, $city, $note,
         $subtotal, $deliveryFee, $total, '952', $paymentMethod,
         $paymentMethod === 'paiement_pro' ? $paymentChannel : null,
         'unpaid', 'pending', $paymentReference,
@@ -131,6 +141,7 @@ try {
     http_response_code(201);
     echo json_encode([
         'order_number' => $orderNumber,
+        'customer_id' => $customerId,
         'payment_method' => $paymentMethod,
         'payment_channel' => $paymentMethod === 'paiement_pro' ? $paymentChannel : null,
         'payment_reference' => $paymentReference,
