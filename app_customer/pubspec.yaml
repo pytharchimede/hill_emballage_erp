@@ -1,0 +1,29 @@
+name: hill_emballage_client
+description: Application mobile grand public Hill Emballage.
+publish_to: "none"
+version: 0.1.0+1
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.6
+  provider: ^6.1.1
+  http: ^1.1.0
+  shared_preferences: ^2.2.2
+  cached_network_image: ^3.3.0
+  intl: ^0.18.1
+  connectivity_plus: ^5.0.1
+  flutter_local_notifications: ^16.1.0
+  firebase_core: ^2.24.2
+  firebase_messaging: ^14.7.10
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
