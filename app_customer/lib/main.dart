@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 
 import 'providers/cart_provider.dart';
 import 'providers/catalog_provider.dart';
-import 'screens/customer_root_screen.dart';
+import 'screens/customer_app_shell.dart';
 import 'services/catalog_service.dart';
 import 'theme/app_theme.dart';
 
@@ -28,7 +28,7 @@ class HillCustomerApp extends StatelessWidget {
         title: 'Hill Emballage',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light(),
-        home: const CustomerRootScreen(),
+        home: const CustomerAppShell(),
       ),
     );
   }
