@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../providers/cart_provider.dart';
 
@@ -46,6 +47,14 @@ class CheckoutService {
     defaultValue: 'http://10.0.2.2/hill_emballage_pos',
   );
 
+  Future<Map<String, String>> _headers() async {
+    final headers = <String, String>{'Content-Type': 'application/json; charset=utf-8'};
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('hill_customer_token');
+    if (token != null && token.isNotEmpty) headers['Authorization'] = 'Bearer $token';
+    return headers;
+  }
+
   Future<CheckoutResult> createOrder({
     required String firstName,
     required String lastName,
@@ -60,7 +69,7 @@ class CheckoutService {
   }) async {
     final response = await _client.post(
       Uri.parse('$_baseUrl/storefront_api/orders.php'),
-      headers: {'Content-Type': 'application/json; charset=utf-8'},
+      headers: await _headers(),
       body: jsonEncode({
         'first_name': firstName,
         'last_name': lastName,
@@ -90,7 +99,7 @@ class CheckoutService {
   Future<PaymentInitResult> initializePaiementPro(String orderNumber) async {
     final response = await _client.post(
       Uri.parse('$_baseUrl/storefront_api/payment_init.php'),
-      headers: {'Content-Type': 'application/json; charset=utf-8'},
+      headers: await _headers(),
       body: jsonEncode({'order_number': orderNumber}),
     );
 
@@ -104,6 +113,7 @@ class CheckoutService {
   Future<Map<String, dynamic>> getOrderStatus(String orderNumber) async {
     final response = await _client.get(
       Uri.parse('$_baseUrl/storefront_api/order_status.php?order=${Uri.encodeQueryComponent(orderNumber)}'),
+      headers: await _headers(),
     );
     final body = _decode(response.body);
     if (response.statusCode != 200) {
